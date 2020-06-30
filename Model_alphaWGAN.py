@@ -25,10 +25,10 @@ class Discriminator(nn.Module):
         self.conv5 = nn.Conv3d(channel, n_class, kernel_size=4, stride=1, padding=0)
         
     def forward(self, x, _return_activations=False):
-        h1 = F.leaky_relu(self.conv1(x), negative_slope=0.2)
-        h2 = F.leaky_relu(self.bn2(self.conv2(h1)), negative_slope=0.2)
-        h3 = F.leaky_relu(self.bn3(self.conv3(h2)), negative_slope=0.2)
-        h4 = F.leaky_relu(self.bn4(self.conv4(h3)), negative_slope=0.2)
+        h1 = nn.LeakyReLU(self.conv1(x), negative_slope=0.2)
+        h2 = nn.LeakyReLU(self.bn2(self.conv2(h1)), negative_slope=0.2)
+        h3 = nn.LeakyReLU(self.bn3(self.conv3(h2)), negative_slope=0.2)
+        h4 = nn.LeakyReLU(self.bn4(self.conv4(h3)), negative_slope=0.2)
         h5 = self.conv5(h4)
         output = h5
         
@@ -81,21 +81,21 @@ class Generator(nn.Module):
         h = self.tp_conv1(noise)
         h = self.relu(self.bn1(h))
         
-        h = F.upsample(h,scale_factor = 2)
+        h = F.interpolate(h,scale_factor = 2)
         h = self.tp_conv2(h)
         h = self.relu(self.bn2(h))
      
-        h = F.upsample(h,scale_factor = 2)
+        h = F.interpolate(h,scale_factor = 2)
         h = self.tp_conv3(h)
         h = self.relu(self.bn3(h))
 
-        h = F.upsample(h,scale_factor = 2)
+        h = F.interpolate(h,scale_factor = 2)
         h = self.tp_conv4(h)
         h = self.relu(self.bn4(h))
 
-        h = F.upsample(h,scale_factor = 2)
+        h = F.interpolate(h,scale_factor = 2)
         h = self.tp_conv5(h)
 
-        h = F.tanh(h)
+        h = torch.tanh(h)
 
         return h
