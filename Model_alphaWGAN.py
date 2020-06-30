@@ -25,10 +25,10 @@ class Discriminator(nn.Module):
         self.conv5 = nn.Conv3d(channel, n_class, kernel_size=4, stride=1, padding=0)
         
     def forward(self, x, _return_activations=False):
-        h1 = nn.LeakyReLU(self.conv1(x), negative_slope=0.2)
-        h2 = nn.LeakyReLU(self.bn2(self.conv2(h1)), negative_slope=0.2)
-        h3 = nn.LeakyReLU(self.bn3(self.conv3(h2)), negative_slope=0.2)
-        h4 = nn.LeakyReLU(self.bn4(self.conv4(h3)), negative_slope=0.2)
+        h1 = F.leaky_relu(self.conv1(x), negative_slope=0.2)
+        h2 = F.leaky_relu(self.bn2(self.conv2(h1)), negative_slope=0.2)
+        h3 = F.leaky_relu(self.bn3(self.conv3(h2)), negative_slope=0.2)
+        h4 = F.leaky_relu(self.bn4(self.conv4(h3)), negative_slope=0.2)
         h5 = self.conv5(h4)
         output = h5
         
@@ -40,10 +40,10 @@ class Code_Discriminator(nn.Module):
         n_class = 1
         self.l1 = nn.Sequential(nn.Linear(code_size, num_units),
                                 nn.BatchNorm1d(num_units),
-                                nn.LeakyReLU(0.2,inplace=True))
+                                nn.LeakyReLU(0.2))
         self.l2 = nn.Sequential(nn.Linear(num_units, num_units),
                                 nn.BatchNorm1d(num_units),
-                                nn.LeakyReLU(0.2,inplace=True))
+                                nn.LeakyReLU(0.2))
         self.l3 = nn.Linear(num_units, 1)
         
     def forward(self, x):
