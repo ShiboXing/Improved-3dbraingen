@@ -1,8 +1,0 @@
-MNI Transform File
-% Deidentified by the LONI IDA
-
-Transform_Type = Linear;
-Linear_Transform =
-    1.03254402    0.04750726   -0.01325858     1.31661332
-   -0.03455589    0.98210061    0.28056377   -49.01642609
-    0.05076231   -0.27218708    1.05581999    -7.16631317 ;

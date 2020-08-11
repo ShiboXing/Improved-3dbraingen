@@ -1,0 +1,29 @@
+{
+    "root": "/projects/shibo/3dbraingen",
+    "program": "<python with no main file>",
+    "git": {
+        "remote": "https://github.com/ShiboXing/3dbraingen.git",
+        "commit": "ec14acc075c5365e4437a98a4cd247f275ac3afa"
+    },
+    "email": "shx26@pitt.edu",
+    "startedAt": "2020-07-18T08:06:05.864020",
+    "host": "vamp-1",
+    "username": "shx26",
+    "executable": "/usr/local/miniconda3/envs/pytorch/bin/python",
+    "os": "Linux-4.15.0-108-generic-x86_64-with-glibc2.10",
+    "python": "3.8.3",
+    "gpu": "GeForce RTX 2080 Ti",
+    "gpu_count": 4,
+    "cpu_count": 40,
+    "cuda": "10.0.130",
+    "args": [
+        "-f",
+        "/run/user/2843/jupyter/kernel-3d53a22a-75fd-414b-b3be-9188f795ca51.json"
+    ],
+    "state": "running",
+    "jobType": null,
+    "mode": "run",
+    "name": "visionary-forest-11",
+    "project": "3dbraingen",
+    "heartbeatAt": "2020-07-18T08:06:07.791799"
+}
