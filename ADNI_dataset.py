@@ -41,7 +41,7 @@ class ADNIdataset(Dataset):
 				rname = file
 		aname = os.listdir(os.path.join(path,rname))[0]
 		path = os.path.join(path,rname,aname,'mri')
-		img = nib.load(os.path.join(path,'image.nii'))
+		img = nib.load(os.path.join(path,'brainmask.mgz'))
 
 		img = np.swapaxes(img.get_data(),1,2)
 		img = np.flip(img,1)
