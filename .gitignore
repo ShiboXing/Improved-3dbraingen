@@ -4,4 +4,3 @@ __pycache__/
 Miniconda*
 checkpoint/
 wandb
-pytorch_ssim
