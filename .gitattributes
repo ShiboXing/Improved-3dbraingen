@@ -1,0 +1,2 @@
+*12500iter.* filter=lfs diff=lfs merge=lfs -text
+*iter12500.* filter=lfs diff=lfs merge=lfs -text
