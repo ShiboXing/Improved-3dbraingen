@@ -4,6 +4,7 @@ import os
 from torch import nn
 from torch import optim
 from torch.nn import functional as F
+from torch.autograd import Variable
 
 class Discriminator(nn.Module):
     def __init__(self, channel=512,out_class=1):
