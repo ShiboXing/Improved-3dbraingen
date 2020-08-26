@@ -1,7 +1,7 @@
 import os
 import torch
 
-def load_checkpoint(G, D, E, CD):
+def load_checkpoint(G, D, E, CD, fname):
     # load the highest savepoints of all models
     iteration = 0
     checkpoint_pth = './checkpoint/'
@@ -12,10 +12,10 @@ def load_checkpoint(G, D, E, CD):
             curr_num = int(s.split('iter')[1].split('.')[0])
             highest_pth = max(highest_pth, curr_num)
         if files:
-            D.load_state_dict(torch.load(f'./checkpoint/*{highest_pth}.pth'))
-            CD.load_state_dict(torch.load(f'./checkpoint/*{highest_pth}.pth'))
-            E.load_state_dict(torch.load(f'./checkpoint/*{highest_pth}.pth'))
-            G.load_state_dict(torch.load(f'./checkpoint/*{highest_pth}.pth'))
+            D.load_state_dict(torch.load(f'./checkpoint/{fname}{highest_pth}.pth'))
+            CD.load_state_dict(torch.load(f'./checkpoint/{fname}{highest_pth}.pth'))
+            E.load_state_dict(torch.load(f'./checkpoint/{fname}{highest_pth}.pth'))
+            G.load_state_dict(torch.load(f'./checkpoint/{fname}{highest_pth}.pth'))
             iteration = highest_pth
     else:
         os.mkdir(checkpoint_pth)
