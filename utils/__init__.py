@@ -1,5 +1,6 @@
 import os
 import torch
+import pandas as pd
 
 def load_checkpoint(G, D, E, CD, fname):
     # load the highest savepoints of all models
@@ -21,3 +22,19 @@ def load_checkpoint(G, D, E, CD, fname):
         os.mkdir(checkpoint_pth)
     
     return iteration
+
+def load_loss():
+    if os.path.exists('./checkpoint/loss.csv'):
+        return pd.read_csv('./checkpoint/loss.csv')
+    else:
+        return pd.DataFrame()
+    
+def add_loss(df, l, index):
+    df = df.append(pd.DataFrame({
+        'index': index,
+        'loss:': l,
+    }))
+    
+def write_loss(df):
+    df.to_csv('./checkpoint/loss.csv')
+    
