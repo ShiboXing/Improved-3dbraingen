@@ -4,3 +4,4 @@ __pycache__/
 Miniconda*
 checkpoint/
 wandb
+trained/

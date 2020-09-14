@@ -25,6 +25,47 @@ def load_checkpoint(G, D, E, CD, fname):
     
     return iteration
 
+def w_load_checkpoint(G, D, fname):
+    # load the highest savepoints of all models
+    iteration = 0
+    checkpoint_pth = './checkpoint/'
+    if os.path.exists(checkpoint_pth):
+        files = set(os.listdir(checkpoint_pth))
+        highest_pth = 0 
+        for s in files:
+            if 'iter' in s:
+                curr_num = int(s.split('iter')[1].split('.')[0])
+                highest_pth = max(highest_pth, curr_num)
+        if files:
+            D.load_state_dict(torch.load(f'./checkpoint/D{fname}{highest_pth}.pth'))
+            G.load_state_dict(torch.load(f'./checkpoint/G{fname}{highest_pth}.pth'))
+            iteration = highest_pth
+    else:
+        os.mkdir(checkpoint_pth)
+    
+    return iteration
+
+def vae_load_checkpoint(G, D, E):
+    # load the highest savepoints of all models
+    iteration = 0
+    checkpoint_pth = './checkpoint/'
+    if os.path.exists(checkpoint_pth):
+        files = set(os.listdir(checkpoint_pth))
+        highest_pth = 0 
+        for s in files:
+            if 'ep' in s:
+                curr_num = int(s.split('ep_')[1].split('_')[0])
+                highest_pth = max(highest_pth, curr_num)
+        if files:
+            D.load_state_dict(torch.load(f'./checkpoint/D_VG_ep_{highest_pth}_247.pth'))
+            E.load_state_dict(torch.load(f'./checkpoint/E_VG_ep_{highest_pth}_247.pth'))
+            G.load_state_dict(torch.load(f'./checkpoint/G_VG_ep_{highest_pth}_247.pth'))
+            iteration = highest_pth
+    else:
+        os.mkdir(checkpoint_pth)
+    
+    return iteration
+
 def load_loss():
     if os.path.exists('./checkpoint/loss.csv'):
         return pd.read_csv('./checkpoint/loss.csv')
