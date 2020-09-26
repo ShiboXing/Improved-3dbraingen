@@ -3,6 +3,8 @@ import torch
 import pandas as pd
 from ipdb import set_trace
 
+trainset = ADNIdataset(augmentation=False)
+
 def load_checkpoint(G, D, E, CD, fname):
     # load the highest savepoints of all models
     iteration = 0
@@ -80,4 +82,38 @@ def add_loss(df, index, l):
     
 def write_loss(df):
     df.to_csv('./checkpoint/loss.csv', index=False)
+    
+def viz_pca(G):
+    sample_df = pd.DataFrame()
+    real_df = pd.DataFrame()
+
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=workers)
+    gen_load = inf_train_gen(train_loader)
+
+    for s in range(512):
+        noise = torch.randn((1, 1000)).cuda()
+        fake = np.squeeze(G(noise)).view(1, -1)
+        sample_df = sample_df.append(pd.DataFrame(fake.cpu().detach().numpy()))
+
+        real = np.squeeze(gen_load.__next__()).view(1, -1)
+        real_df = real_df.append(pd.DataFrame(real.cpu().detach().numpy()))
+        print(s, end=' ')
+
+    # PCA of fake images
+    pca = PCA(n_components=2)
+    samples = StandardScaler().fit_transform(sample_df)
+    PCs = pca.fit_transform(sample_df)
+    plt.scatter(PCs[:, 0], PCs[:, 1])
+
+    # PCA of real images
+    reals = StandardScaler().fit_transform(real_df)
+    real_PCs = pca.fit_transform(real_df)
+    plt.scatter(real_PCs[:, 0], real_PCs[:, 1])
+    plt.show()
+
+def viz_mmd():
+    pass
+
+def viz_all_imgs(path):
+    pass
     
