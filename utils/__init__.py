@@ -115,5 +115,7 @@ def viz_mmd():
     pass
 
 def viz_all_imgs(path):
-    pass
+    
+    featmask = np.squeeze((0.5*real_images[0]+0.5).data.cpu().numpy())
+    featmask = nib.Nifti1Image(featmask,affine = np.eye(4))
     
