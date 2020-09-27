@@ -6,7 +6,6 @@ import os
 from torchvision import transforms
 from skimage.transform import resize
 from nilearn import surface
-import nibabel as nib
 
 class ADNIdataset(Dataset):
 	def __init__(self, root='../ADNI', augmentation=False):

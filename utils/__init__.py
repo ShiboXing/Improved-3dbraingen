@@ -1,9 +1,18 @@
 import os
 import torch
 import pandas as pd
+import nibabel as nib
 from ipdb import set_trace
+from skimage.transform import resize
+from nilearn import plotting
+import nibabel as nib
+import numpy as np
 
-trainset = ADNIdataset(augmentation=False)
+
+
+sp_size = 64
+arr1 = [4,6,8,10,12,14,16,18,20,22,24,26,28,30,32]
+arr2 = [34,36,38,40,42,44,46,48,50,52,54,56,58,60]
 
 def load_checkpoint(G, D, E, CD, fname):
     # load the highest savepoints of all models
@@ -83,7 +92,7 @@ def add_loss(df, index, l):
 def write_loss(df):
     df.to_csv('./checkpoint/loss.csv', index=False)
     
-def viz_pca(G):
+def viz_pca(G, trainset):
     sample_df = pd.DataFrame()
     real_df = pd.DataFrame()
 
@@ -114,8 +123,31 @@ def viz_pca(G):
 def viz_mmd():
     pass
 
-def viz_all_imgs(path):
-    
-    featmask = np.squeeze((0.5*real_images[0]+0.5).data.cpu().numpy())
-    featmask = nib.Nifti1Image(featmask,affine = np.eye(4))
+def viz_all_imgs(path, count):
+    for f in os.listdir(path):
+        if f.endswith('mgz'):
+            print(f'{count}: {path}/{f}')
+            count[0] += 1
+            
+            # further reprocessing
+            img = nib.load(os.path.join(path,'brainmask.mgz'))
+            img = np.swapaxes(img.get_data(),1,2)
+            img = np.flip(img,1)
+            img = np.flip(img,2)
+            img = resize(img, (sp_size,sp_size,sp_size), mode='constant')
+            img = torch.from_numpy(img).float().view(1,sp_size,sp_size,sp_size)
+            img = img*2-1
+            
+            featmask = np.squeeze((0.5*img+0.5).data.cpu().numpy())
+            featmask = nib.Nifti1Image(featmask,affine = np.eye(4))
+            disp = plotting.plot_img(featmask,cut_coords=arr1,draw_cross=False,annotate=False,black_bg=True,display_mode='x')
+            plotting.show()
+            disp=plotting.plot_img(featmask,cut_coords=arr2,draw_cross=False,annotate=False,black_bg=True,display_mode='x')
+            plotting.show()
+            
+            plotting.plot_img(featmask,title="X_Real")
+            plotting.show()
+        elif os.path.isdir(f'{path}/{f}'):
+            viz_all_imgs(f'{path}/{f}', count)
+            
     
