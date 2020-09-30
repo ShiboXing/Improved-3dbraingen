@@ -4,14 +4,16 @@ import os
 from torch import nn
 from torch import optim
 from torch.nn import functional as F
+from ipdb import set_trace
 
 #***********************************************
 #Encoder and Discriminator has same architecture
 #***********************************************
 class Discriminator(nn.Module):
-    def __init__(self, channel=512,out_class=1,is_dis =True):
+    def __init__(self, channel=512,out_class=1,is_dis =True, img_size=64):
         super(Discriminator, self).__init__()
-        self.is_dis=is_dis
+        self.img_size = img_size
+        self.is_dis = is_dis
         self.channel = channel
         n_class = out_class 
         
@@ -24,15 +26,22 @@ class Discriminator(nn.Module):
         self.bn4 = nn.BatchNorm3d(channel)
         self.conv5 = nn.Conv3d(channel, n_class, kernel_size=4, stride=1, padding=0)
         
+        # for 128^3 images:
+        self.bn5 = nn.BatchNorm3d(n_class)
+        self.conv6 = nn.Conv3d(n_class, n_class, kernel_size=3, stride=1, padding=0)
+        
+        
     def forward(self, x, _return_activations=False):
         h1 = F.leaky_relu(self.conv1(x), negative_slope=0.2)
         h2 = F.leaky_relu(self.bn2(self.conv2(h1)), negative_slope=0.2)
         h3 = F.leaky_relu(self.bn3(self.conv3(h2)), negative_slope=0.2)
         h4 = F.leaky_relu(self.bn4(self.conv4(h3)), negative_slope=0.2)
         h5 = self.conv5(h4)
-        output = h5
-        
-        return output
+        if self.img_size == 128:
+            h6 = F.leaky_relu(self.bn5(self.conv6(h5)), negative_slope=0.2)
+            return h6
+        else:
+            return h5
     
 class Code_Discriminator(nn.Module):
     def __init__(self, code_size=100,num_units=750):
@@ -78,24 +87,19 @@ class Generator(nn.Module):
     def forward(self, noise):
 
         noise = noise.view(-1,self.noise,1,1,1)
-        h = self.tp_conv1(noise)
-        h = self.relu(self.bn1(h))
+        h1 = self.relu(self.bn1(self.tp_conv1(noise)))
         
-        h = F.interpolate(h,scale_factor = 2)
-        h = self.tp_conv2(h)
-        h = self.relu(self.bn2(h))
+        h2 = F.interpolate(h1,scale_factor = 2)
+        h2 = self.relu(self.bn2(self.tp_conv2(h2)))
      
-        h = F.interpolate(h,scale_factor = 2)
-        h = self.tp_conv3(h)
-        h = self.relu(self.bn3(h))
+        h3 = F.interpolate(h2,scale_factor = 2)
+        h3 = self.relu(self.bn3(self.tp_conv3(h3)))
 
-        h = F.interpolate(h,scale_factor = 2)
-        h = self.tp_conv4(h)
-        h = self.relu(self.bn4(h))
+        h4 = F.interpolate(h3,scale_factor = 2)
+        h4 = self.relu(self.bn4(self.tp_conv4(h4)))
 
-        h = F.interpolate(h,scale_factor = 2)
-        h = self.tp_conv5(h)
-
-        h = torch.tanh(h)
-
-        return h
+        h5 = F.interpolate(h4,scale_factor = 2)
+        h5 = self.tp_conv5(h5)
+        
+        set_trace()
+        return torch.tanh(h5)
