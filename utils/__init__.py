@@ -124,10 +124,12 @@ def viz_mmd():
     pass
 
 def viz_all_imgs(path, count):
+    output_dir = './imgs_visualization'
+    if not os.path.exists(output_dir):
+        os.mkdir('./imgs_visualization')
     for f in os.listdir(path):
         if f.endswith('mgz'):
-            print(f'{count}: {path}/{f}')
-            count[0] += 1
+            print(f'{count[0]}: {path}/{f}')
             
             # further reprocessing
             img = nib.load(os.path.join(path,'brainmask.mgz'))
@@ -144,9 +146,12 @@ def viz_all_imgs(path, count):
             plotting.show()
             disp=plotting.plot_img(featmask,cut_coords=arr2,draw_cross=False,annotate=False,black_bg=True,display_mode='x')
             plotting.show()
-            
-            plotting.plot_img(featmask,title="X_Real")
+            subject = path.split('/')[-2]
+            plotting.plot_img(featmask,title=f'subject: {subject}_index: {count}')
+            plotting.plot_img(featmask,title=f'subject: {subject}_index: {count}',\
+                              output_file=f'{output_dir}/subject_{subject}_index_{count[0]}.png')
             plotting.show()
+            count[0] += 1
         elif os.path.isdir(f'{path}/{f}'):
             viz_all_imgs(f'{path}/{f}', count)
             
