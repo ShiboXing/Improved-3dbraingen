@@ -101,5 +101,4 @@ class Generator(nn.Module):
         h5 = F.interpolate(h4,scale_factor = 2)
         h5 = self.tp_conv5(h5)
         
-        set_trace()
         return torch.tanh(h5)
