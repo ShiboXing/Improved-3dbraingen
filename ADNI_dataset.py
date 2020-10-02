@@ -7,9 +7,11 @@ from torchvision import transforms
 from skimage.transform import resize
 from nilearn import surface
 import nibabel as nib
+from ipdb import set_trace
 
 class ADNIdataset(Dataset):
-	def __init__(self, root='../ADNI', augmentation=False, img_size=64):
+	def __init__(self, root='../ADNI', augmentation=False, img_size=64, normalization=True):
+		self.normalization=normalization
 		self.img_size=img_size
 		self.root = root
 		self.basis = 'FreeSurfer_Cross-Sectional_Processing_brainmask'
@@ -42,7 +44,6 @@ class ADNIdataset(Dataset):
 		aname = os.listdir(os.path.join(path,rname))[0]
 		path = os.path.join(path,rname,aname,'mri')
 		img = nib.load(os.path.join(path,'brainmask.mgz'))
-
 		img = np.swapaxes(img.get_data(),1,2)
 		img = np.flip(img,1)
 		img = np.flip(img,2)
@@ -52,10 +53,14 @@ class ADNIdataset(Dataset):
 			random_i = 0.3*torch.rand(1)[0]+0.7
 			if random_n[0] > 0.5:
 				img = np.flip(img,0)
-			img = img*random_i.data.cpu().numpy()
-            
-		imageout = torch.from_numpy(img).float().view(1,self.img_size,self.img_size,self.img_size)
-		imageout = imageout*2-1
+			img = img*random_i.data.cpu().numpy()     
+     
+		lo, hi = img.min(), img.max()
+		print(f'dataset lo: {lo} hi: {hi}')   
+		imageout = img
+		if self.normalization: 
+			imageout = torch.from_numpy(img).float().view(1,self.img_size,self.img_size,self.img_size)
+			imageout = imageout*2-1
 
 		return imageout
 
