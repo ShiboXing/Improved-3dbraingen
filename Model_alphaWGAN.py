@@ -26,7 +26,7 @@ class Discriminator(nn.Module):
         self.bn4 = nn.BatchNorm3d(channel)
         self.conv5 = nn.Conv3d(channel, n_class, kernel_size=4, stride=1, padding=0)
         
-        # for 128^3 images:
+        # for 96^3 images:
         self.bn5 = nn.BatchNorm3d(n_class)
         self.conv6 = nn.Conv3d(n_class, n_class, kernel_size=3, stride=1, padding=0)
         
@@ -37,7 +37,7 @@ class Discriminator(nn.Module):
         h3 = F.leaky_relu(self.bn3(self.conv3(h2)), negative_slope=0.2)
         h4 = F.leaky_relu(self.bn4(self.conv4(h3)), negative_slope=0.2)
         h5 = self.conv5(h4)
-        if self.img_size == 128:
+        if self.img_size == 96:
             h6 = F.leaky_relu(self.bn5(self.conv6(h5)), negative_slope=0.2)
             return h6
         else:

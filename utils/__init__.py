@@ -7,6 +7,9 @@ from skimage.transform import resize
 from nilearn import plotting
 import nibabel as nib
 import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 
 
@@ -92,33 +95,38 @@ def add_loss(df, index, l):
 def write_loss(df):
     df.to_csv('./checkpoint/loss.csv', index=False)
     
-def viz_pca(G, trainset):
+def viz_pca(G, trainset, latent_size=1000, is_fake=True, index=0):
     sample_df = pd.DataFrame()
     real_df = pd.DataFrame()
 
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=workers)
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
     gen_load = inf_train_gen(train_loader)
-
+    
     for s in range(512):
-        noise = torch.randn((1, 1000)).cuda()
+        noise = torch.randn((1, latent_size)).cuda()
         fake = np.squeeze(G(noise)).view(1, -1)
         sample_df = sample_df.append(pd.DataFrame(fake.cpu().detach().numpy()))
 
         real = np.squeeze(gen_load.__next__()).view(1, -1)
         real_df = real_df.append(pd.DataFrame(real.cpu().detach().numpy()))
-        print(s, end=' ')
-
-    # PCA of fake images
-    pca = PCA(n_components=2)
-    samples = StandardScaler().fit_transform(sample_df)
-    PCs = pca.fit_transform(sample_df)
-    plt.scatter(PCs[:, 0], PCs[:, 1])
-
-    # PCA of real images
-    reals = StandardScaler().fit_transform(real_df)
-    real_PCs = pca.fit_transform(real_df)
-    plt.scatter(real_PCs[:, 0], real_PCs[:, 1])
+    print(f'index: {index}')
+    if is_fake:
+        # PCA of fake images
+        pca = PCA(n_components=2)
+        samples = StandardScaler().fit_transform(sample_df)
+        PCs = pca.fit_transform(sample_df)
+        plt.scatter(PCs[:, 0], PCs[:, 1])
+    else:
+        # PCA of real images
+        reals = StandardScaler().fit_transform(real_df)
+        real_PCs = pca.fit_transform(real_df)
+        plt.scatter(real_PCs[:, 0], real_PCs[:, 1])
     plt.show()
+        
+def inf_train_gen(data_loader):
+    while True:
+        for _,images in enumerate(data_loader):
+            yield images
 
 def viz_mmd():
     pass

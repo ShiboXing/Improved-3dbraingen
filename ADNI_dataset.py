@@ -54,9 +54,6 @@ class ADNIdataset(Dataset):
 			if random_n[0] > 0.5:
 				img = np.flip(img,0)
 			img = img*random_i.data.cpu().numpy()     
-     
-		lo, hi = img.min(), img.max()
-		print(f'dataset lo: {lo} hi: {hi}')   
 		imageout = img
 		if self.normalization: 
 			imageout = torch.from_numpy(img).float().view(1,self.img_size,self.img_size,self.img_size)
