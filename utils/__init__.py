@@ -80,22 +80,19 @@ def vae_load_checkpoint(G, D, E):
     
     return iteration
 
-def load_loss():
-    if os.path.exists('./checkpoint/loss.csv'):
-        return pd.read_csv('./checkpoint/loss.csv')
+def load_loss(path='./checkpoint/loss.csv'):
+    if os.path.exists(path):
+        return pd.read_csv(path)
     else:
         return pd.DataFrame()
     
-def add_loss(df, index, l):
-    return df.append(pd.DataFrame({
-        'index': [index],
-        'loss:': [l]
-    }))
+def add_loss(df, loss_dict):
+    return df.append(pd.DataFrame(loss_dict))
     
 def write_loss(df):
     df.to_csv('./checkpoint/loss.csv', index=False)
     
-def viz_pca(G, trainset, latent_size=1000, is_fake=True, index=0):
+def viz_pca(G, trainset, latent_size=1000, viz_fake=True, viz_real=True, index=0):
     sample_df = pd.DataFrame()
     real_df = pd.DataFrame()
 
@@ -110,13 +107,13 @@ def viz_pca(G, trainset, latent_size=1000, is_fake=True, index=0):
         real = np.squeeze(gen_load.__next__()).view(1, -1)
         real_df = real_df.append(pd.DataFrame(real.cpu().detach().numpy()))
     print(f'index: {index}')
-    if is_fake:
+    if viz_fake:
         # PCA of fake images
         pca = PCA(n_components=2)
         samples = StandardScaler().fit_transform(sample_df)
         PCs = pca.fit_transform(sample_df)
         plt.scatter(PCs[:, 0], PCs[:, 1])
-    else:
+    if viz_real:
         # PCA of real images
         reals = StandardScaler().fit_transform(real_df)
         real_PCs = pca.fit_transform(real_df)
