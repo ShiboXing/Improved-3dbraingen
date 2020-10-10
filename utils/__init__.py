@@ -92,21 +92,30 @@ def add_loss(df, loss_dict):
 def write_loss(df):
     df.to_csv('./checkpoint/loss.csv', index=False)
     
-def viz_pca(G, trainset, latent_size=1000, viz_fake=True, viz_real=True, index=0):
+def viz_pca(model, trainset, latent_size=1000, is_cd=False, viz_fake=True, viz_real=True, index=0):
     sample_df = pd.DataFrame()
     real_df = pd.DataFrame()
-
+    
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
     gen_load = inf_train_gen(train_loader)
     
     for s in range(512):
         noise = torch.randn((1, latent_size)).cuda()
-        fake = np.squeeze(G(noise)).view(1, -1)
-        sample_df = sample_df.append(pd.DataFrame(fake.cpu().detach().numpy()))
-
-        real = np.squeeze(gen_load.__next__()).view(1, -1)
-        real_df = real_df.append(pd.DataFrame(real.cpu().detach().numpy()))
-    print(f'index: {index}')
+        real = gen_load.__next__().cuda()
+        if not is_cd:
+            fake = np.squeeze(model(noise)).view(1, -1)
+            sample_df = sample_df.append(pd.DataFrame(fake.cpu().detach().numpy()))
+            real_df = real_df.append(pd.DataFrame(np.squeeze(real).view(1, -1).cpu().detach().numpy()))
+            plt.title('Images PCA (blue is fake)')
+        else:
+            z_e = model(real).view(1, -1).cuda()
+            sample_df = sample_df.append(pd.DataFrame(z_e.cpu().detach().numpy()))
+            real_df = real_df.append(pd.DataFrame(noise.cpu().detach().numpy()))
+            plt.title('latent vector PCA (blue is z_e)')
+    
+    blue_mean = sample_df.mean(1).mean(0)
+    yellow_mean = real_df.mean(1).mean(0)
+    print(f'index: {index}, sample_mean: {blue_mean}, yellow_mean: {yellow_mean}')
     if viz_fake:
         # PCA of fake images
         pca = PCA(n_components=2)
@@ -119,6 +128,8 @@ def viz_pca(G, trainset, latent_size=1000, viz_fake=True, viz_real=True, index=0
         real_PCs = pca.fit_transform(real_df)
         plt.scatter(real_PCs[:, 0], real_PCs[:, 1])
     plt.show()
+    
+
         
 def inf_train_gen(data_loader):
     while True:
@@ -159,5 +170,4 @@ def viz_all_imgs(path, count):
             count[0] += 1
         elif os.path.isdir(f'{path}/{f}'):
             viz_all_imgs(f'{path}/{f}', count)
-            
     
