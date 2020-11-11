@@ -2,6 +2,6 @@
 __pycache__/
 *.pth
 Miniconda*
-checkpoint/
+*checkpoint/
 wandb
 trained/

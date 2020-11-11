@@ -37,11 +37,11 @@ class Discriminator(nn.Module):
         h3 = F.leaky_relu(self.bn3(self.conv3(h2)), negative_slope=0.2)
         h4 = F.leaky_relu(self.bn4(self.conv4(h3)), negative_slope=0.2)
         h5 = self.conv5(h4)
-        if self.img_size == 96:
-            h6 = F.leaky_relu(self.bn5(self.conv6(h5)), negative_slope=0.2)
-            return h6
-        else:
-            return h5
+        return h5
+#         if not self.is_dis:
+#             return F.softmax(h5.view(h5.shape[0], -1), dim=1) * 2 - 1
+#         else:
+#             return F.softmax(h5.view(1, -1)) * 2 - 1
     
 class Code_Discriminator(nn.Module):
     def __init__(self, code_size=100,num_units=750):
@@ -60,7 +60,6 @@ class Code_Discriminator(nn.Module):
         h2 = self.l2(h1)
         h3 = self.l3(h2)
         output = h3
-            
         return output
 
 class Generator(nn.Module):

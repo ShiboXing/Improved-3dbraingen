@@ -5,6 +5,7 @@ from torch import nn
 from torch import optim
 from torch.nn import functional as F
 from torch.autograd import Variable
+from ipdb import set_trace
 
 class Discriminator(nn.Module):
     def __init__(self, channel=512,out_class=1):
@@ -34,11 +35,13 @@ class Discriminator(nn.Module):
         return output
 
 class Encoder(nn.Module):
-    def __init__(self, channel=512,out_class=1):
+    def __init__(self, channel=512,out_class=1,gpu_ind=0):
         super(Encoder, self).__init__()
         
+        self.is_vae = True
         self.channel = channel
         n_class = out_class 
+        self.gpu_ind = gpu_ind
         
         self.conv1 = nn.Conv3d(1, channel//8, kernel_size=4, stride=2, padding=1)
         self.conv2 = nn.Conv3d(channel//8, channel//4, kernel_size=4, stride=2, padding=1)
@@ -52,15 +55,18 @@ class Encoder(nn.Module):
             nn.Linear(32768, 2048),
             nn.BatchNorm1d(2048),
             nn.ReLU(),
-            nn.Linear(2048, 1000))
+            nn.Linear(2048, 1000)).cuda(self.gpu_ind)
         self.logvar = nn.Sequential(
             nn.Linear(32768, 2048),
             nn.BatchNorm1d(2048),
             nn.ReLU(),
-            nn.Linear(2048, 1000))
+            nn.Linear(2048, 1000)).cuda(self.gpu_ind)
+        
+    def set_gpu(self, gpu_ind):
+        self.gpu_ind = gpu_ind
         
     def forward(self, x, _return_activations=False):
-        batch_size = x.size()[0]
+        batch_size = x.size()[0] 
         h1 = F.leaky_relu(self.conv1(x), negative_slope=0.2)
         h2 = F.leaky_relu(self.bn2(self.conv2(h1)), negative_slope=0.2)
         h3 = F.leaky_relu(self.bn3(self.conv3(h2)), negative_slope=0.2)
@@ -68,10 +74,11 @@ class Encoder(nn.Module):
         
         mean = self.mean(h4.view(batch_size,-1))
         logvar = self.logvar(h4.view(batch_size,-1))
-
+        
         std = logvar.mul(0.5).exp_()
-        reparametrized_noise = Variable(torch.randn((batch_size, 1000))).cuda()
+        reparametrized_noise = torch.randn((batch_size, 1000)).cuda(self.gpu_ind)
         reparametrized_noise = mean + std * reparametrized_noise
+        
         return mean,logvar ,reparametrized_noise
     
 class Generator(nn.Module):
