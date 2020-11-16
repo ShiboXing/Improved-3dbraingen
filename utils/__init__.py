@@ -42,7 +42,7 @@ def load_checkpoint(G, D, E, CD, fname, path='checkpoint'):
 def w_load_checkpoint(G, D, fname):
     # load the highest savepoints of all models
     iteration = 0
-    checkpoint_pth = './checkpoint/'
+    checkpoint_pth = './vae_checkpoint/'
     if os.path.exists(checkpoint_pth):
         files = set(os.listdir(checkpoint_pth))
         highest_pth = 0 
@@ -51,8 +51,8 @@ def w_load_checkpoint(G, D, fname):
                 curr_num = int(s.split('iter')[1].split('.')[0])
                 highest_pth = max(highest_pth, curr_num)
         if files:
-            D.load_state_dict(torch.load(f'./checkpoint/D{fname}{highest_pth}.pth'))
-            G.load_state_dict(torch.load(f'./checkpoint/G{fname}{highest_pth}.pth'))
+            D.load_state_dict(torch.load(f'./{checkpoint_pth}/D{fname}{highest_pth}.pth'))
+            G.load_state_dict(torch.load(f'./{checkpoint_pth}/G{fname}{highest_pth}.pth'))
             iteration = highest_pth
     else:
         os.mkdir(checkpoint_pth)
@@ -62,19 +62,19 @@ def w_load_checkpoint(G, D, fname):
 def vae_load_checkpoint(G, D, E):
     # load the highest savepoints of all models
     iteration = 0
-    checkpoint_pth = './checkpoint/'
+    checkpoint_pth = './vae_checkpoint/'
     if os.path.exists(checkpoint_pth):
         files = set(os.listdir(checkpoint_pth))
         highest_pth = 0 
         for s in files:
             if 'ep' in s:
-                curr_num = int(s.split('ep_')[1].split('_')[0])
+                curr_num = int(s.split('ep_')[1].split('.')[0])
                 highest_pth = max(highest_pth, curr_num)
         if files:
-            D.load_state_dict(torch.load(f'./checkpoint/D_VG_ep_{highest_pth}_247.pth'))
-            E.load_state_dict(torch.load(f'./checkpoint/E_VG_ep_{highest_pth}_247.pth'))
-            G.load_state_dict(torch.load(f'./checkpoint/G_VG_ep_{highest_pth}_247.pth'))
-            iteration = highest_pth
+            D.load_state_dict(torch.load(f'./vae_checkpoint/D_VG_ep_{highest_pth}.pth'))
+            E.load_state_dict(torch.load(f'./vae_checkpoint/E_VG_ep_{highest_pth}.pth'))
+            G.load_state_dict(torch.load(f'./vae_checkpoint/G_VG_ep_{highest_pth}.pth'))
+            iteration = highest_pth + 1
     else:
         os.mkdir(checkpoint_pth)
     
@@ -131,9 +131,9 @@ def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, viz_fa
             real_df = real_df.append(pd.DataFrame(noise.cpu().detach().numpy()))
     
 #     if is_cd:
-#         # calculate the variance of the vector's entries
-#         sample_vars = sample_df.var(axis=0).transpose().to_frame()
-#         real_vars = real_df.var(axis=0).transpose().to_frame()
+# #         calculate the variance of the vector's entries
+#         sample_vars = sample_df.transpose().sort_values(axis=1).to_frame()
+#         real_vars = real_df.transpose().sort_values(axis=1).to_frame()
 #         plt.figure()
 #         vars_plot = pd.concat([real_vars, sample_vars], axis=1)
 #         vars_plot[[0,0]].plot()
@@ -225,7 +225,7 @@ def viz_all_imgs(path, count):
             viz_all_imgs(f'{path}/{f}', count)
 
 
-def calc_mmd(train_loader, G, df, iteration, count=1, no_write=False, gpu_ind=1, E=None, path='test_data_mmd', var=1):
+def calc_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=None, path='test_data', var=1):
     for p in G.parameters():
         p.requires_grad = False
     if not os.path.exists(f'./{path}'):
@@ -236,9 +236,9 @@ def calc_mmd(train_loader, G, df, iteration, count=1, no_write=False, gpu_ind=1,
         for i,(y) in enumerate(train_loader):
             y = y.cuda(gpu_ind)
             if E:
-                noise = E(y).cuda(gpu_ind) * var
+                noise = E(y).cuda(gpu_ind) 
             else:
-                noise = torch.randn((y.size(0), 1000)).cuda(gpu_ind)
+                noise = torch.randn(y.size(0), 1000).cuda(gpu_ind) * var
             x = G(noise)
             B = y.size(0)
             x = x.view(x.size(0), x.size(2) * x.size(3)*x.size(4))
