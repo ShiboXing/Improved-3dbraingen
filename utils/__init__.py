@@ -95,8 +95,8 @@ def load_csv(path):
 def add_loss(df, loss_dict):
     return df.append(pd.DataFrame(loss_dict))
 
-def write_loss(df):
-    df.to_csv('./checkpoint/loss.csv', index=False)
+def write_loss(df, path='checkpoint'):
+    df.to_csv(f'./{path}/loss.csv', index=False)
     
 def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, viz_fake=True, viz_real=True, index=0, gpu_ind=0):
     sample_df = pd.DataFrame()
