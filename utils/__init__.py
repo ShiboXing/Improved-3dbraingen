@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from torch.autograd import Variable
 
 
 
@@ -59,10 +60,10 @@ def w_load_checkpoint(G, D, fname):
     
     return iteration
 
-def vae_load_checkpoint(G, D, E):
+def vae_load_checkpoint(G, D, E, checkpoint_name='vae_checkpoint'):
     # load the highest savepoints of all models
     iteration = 0
-    checkpoint_pth = './vae_checkpoint/'
+    checkpoint_pth = f'./{checkpoint_name}/'
     if os.path.exists(checkpoint_pth):
         files = set(os.listdir(checkpoint_pth))
         highest_pth = 0 
@@ -71,9 +72,9 @@ def vae_load_checkpoint(G, D, E):
                 curr_num = int(s.split('ep_')[1].split('.')[0])
                 highest_pth = max(highest_pth, curr_num)
         if files:
-            D.load_state_dict(torch.load(f'./vae_checkpoint/D_VG_ep_{highest_pth}.pth'))
-            E.load_state_dict(torch.load(f'./vae_checkpoint/E_VG_ep_{highest_pth}.pth'))
-            G.load_state_dict(torch.load(f'./vae_checkpoint/G_VG_ep_{highest_pth}.pth'))
+            D.load_state_dict(torch.load(f'./{checkpoint_name}/D_VG_ep_{highest_pth}.pth'))
+            E.load_state_dict(torch.load(f'./{checkpoint_name}/E_VG_ep_{highest_pth}.pth'))
+            G.load_state_dict(torch.load(f'./{checkpoint_name}/G_VG_ep_{highest_pth}.pth'))
             iteration = highest_pth + 1
     else:
         os.mkdir(checkpoint_pth)
@@ -98,7 +99,7 @@ def add_loss(df, loss_dict):
 def write_loss(df, path='checkpoint'):
     df.to_csv(f'./{path}/loss.csv', index=False)
     
-def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, viz_fake=True, viz_real=True, index=0, gpu_ind=0):
+def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, is_vae=False, viz_fake=True, viz_real=True, index=0, gpu_ind=0):
     sample_df = pd.DataFrame()
     real_df = pd.DataFrame()
     
@@ -123,6 +124,7 @@ def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, viz_fa
         else:
             real = gen_load.__next__().cuda(gpu_ind)
             z_e = model(real)
+            # handle vae
             if type(z_e) != tuple:
                 z_e = z_e.view(1, -1)
             else:
@@ -130,14 +132,14 @@ def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, viz_fa
             sample_df = sample_df.append(pd.DataFrame(z_e.cpu().detach().numpy()))
             real_df = real_df.append(pd.DataFrame(noise.cpu().detach().numpy()))
     
-#     if is_cd:
-# #         calculate the variance of the vector's entries
-#         sample_vars = sample_df.transpose().sort_values(axis=1).to_frame()
-#         real_vars = real_df.transpose().sort_values(axis=1).to_frame()
-#         plt.figure()
-#         vars_plot = pd.concat([real_vars, sample_vars], axis=1)
-#         vars_plot[[0,0]].plot()
-#         plt.show()
+    if is_cd:
+#         calculate the variance of the vector's entries
+        sample_vars = sample_df.transpose().var(axis=1).to_frame()
+        real_vars = real_df.transpose().var(axis=1).to_frame()
+        plt.figure()
+        vars_plot = pd.concat([real_vars, sample_vars], axis=1)
+        vars_plot[[0,0]].plot()
+        plt.show()
         
         
 
@@ -146,7 +148,10 @@ def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, viz_fa
     blue_var = sample_df.var(1).mean(0)
     yellow_var = real_df.var(1).mean(0)
     print(f'index: {index}, sample_mean: {blue_mean} sample_var: {blue_var}, yellow_mean: {yellow_mean} yellow_var: {yellow_var}')
-    plt.title('latent vector PCA (blue is z_e)')
+    if is_cd:
+        plt.title('latent vector PCA (blue is z_e)')
+    else:
+        plt.title('X PCA (blue is X_rand)')
     if viz_fake:
         # PCA of fake images
         pca = PCA(n_components=2)
@@ -261,9 +266,28 @@ def calc_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=N
                 'mmd_score': [mean]
             }))
             df.to_csv(f'./{path}/mmd.csv', index=False)
-        torch.cuda.empty_cache()    
-        
+        torch.cuda.empty_cache()   
     
     meanarr = np.array(df.iloc[:]['mmd_score'].tolist())
 #     print('Total_mean:'+str(np.mean(meanarr))+' STD:'+str(np.std(meanarr)))
-    
+
+def calc_gradient_penalty(model, x, x_gen, w=10, cuda_ind=0):
+    _eps = 1e-15
+    """WGAN-GP gradient penalty"""
+    assert x.size()==x_gen.size(), "real and sampled sizes do not match"
+    alpha_size = tuple((len(x), *(1,)*(x.dim()-1)))
+    alpha_t = torch.cuda.FloatTensor if x.is_cuda else torch.Tensor
+    alpha = alpha_t(*alpha_size).uniform_().cuda(cuda_ind)
+    #x_hat = x.data*alpha + x_gen.data*(1-alpha)
+    x_hat = x*alpha + x_gen*(1-alpha)
+    x_hat = Variable(x_hat, requires_grad=True)
+
+    def eps_norm(x):
+        x = x.view(len(x), -1)
+        return (x*x+_eps).sum(-1).sqrt()
+    def bi_penalty(x):
+        return (x-1)**2
+    grad_xhat = torch.autograd.grad(model(x_hat).sum(), x_hat, create_graph=True, only_inputs=True)[0]
+
+    penalty = w*bi_penalty(eps_norm(grad_xhat)).mean()
+    return penalty

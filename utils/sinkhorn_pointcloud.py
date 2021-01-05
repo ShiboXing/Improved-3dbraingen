@@ -29,8 +29,8 @@ def sinkhorn_loss(x, y, epsilon, n, niter, gpu=0):
     # both marginals are fixed with equal weights
     # mu = Variable(1. / n * torch.cuda.FloatTensor(n).fill_(1), requires_grad=False)
     # nu = Variable(1. / n * torch.cuda.FloatTensor(n).fill_(1), requires_grad=False)
-    mu = Variable(1. / n * torch.FloatTensor(n).fill_(1), requires_grad=True).cuda(gpu)
-    nu = Variable(1. / n * torch.FloatTensor(n).fill_(1), requires_grad=True).cuda(gpu)
+    mu = 1. / n * torch.FloatTensor(n).fill_(1).cuda(gpu)
+    nu = 1. / n * torch.FloatTensor(n).fill_(1).cuda(gpu)
 
     # Parameters of the Sinkhorn algorithm.
     rho = 1  # (.5) **2          # unbalanced transport
@@ -68,11 +68,10 @@ def sinkhorn_loss(x, y, epsilon, n, niter, gpu=0):
         actual_nits += 1
         if (err < thresh).data.cpu().numpy():
             break
-    
+            
     U, V = u, v
     pi = torch.exp(M(U, V))  # Transport plan pi = diag(a)*K*diag(b)
     cost = torch.sum(pi * C)  # Sinkhorn cost
-    
     return cost
 
 
@@ -81,5 +80,4 @@ def cost_matrix(x, y, p=2):
     x_col = x.unsqueeze(1)
     y_lin = y.unsqueeze(0)
     c = torch.sum((torch.abs(x_col - y_lin)) ** p, 2)
-    set_trace()
     return c

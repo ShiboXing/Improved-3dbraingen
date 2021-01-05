@@ -26,10 +26,6 @@ class Discriminator(nn.Module):
         self.bn4 = nn.BatchNorm3d(channel)
         self.conv5 = nn.Conv3d(channel, n_class, kernel_size=4, stride=1, padding=0)
         
-        # for 96^3 images:
-        self.bn5 = nn.BatchNorm3d(n_class)
-        self.conv6 = nn.Conv3d(n_class, n_class, kernel_size=3, stride=1, padding=0)
-        
         
     def forward(self, x, _return_activations=False):
         h1 = F.leaky_relu(self.conv1(x), negative_slope=0.2)
@@ -38,10 +34,6 @@ class Discriminator(nn.Module):
         h4 = F.leaky_relu(self.bn4(self.conv4(h3)), negative_slope=0.2)
         h5 = self.conv5(h4)
         return h5
-#         if not self.is_dis:
-#             return F.softmax(h5.view(h5.shape[0], -1), dim=1) * 2 - 1
-#         else:
-#             return F.softmax(h5.view(1, -1)) * 2 - 1
     
 class Code_Discriminator(nn.Module):
     def __init__(self, code_size=100,num_units=750):
