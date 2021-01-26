@@ -242,6 +242,11 @@ def calc_ssim(G, index, path, no_write=True, gpu=0):
     df = load_csv(f'./{path}/ssim.csv')
     if len(df):
         last_ssim = int(df.iloc[-1]['index'])
+        if 'vae' in path:
+            G.load_state_dict(torch.load(f'./{path}/G_VG_ep_{last_ssim+1}.pth'))
+        else:
+            G.load_state_dict(torch.load(f'./{path}/G_iter{last_ssim + 1000}.pth'))
+            
         
     sum_ssim = 0
     for i in range(1000):
