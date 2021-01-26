@@ -3,6 +3,7 @@ import torch
 import pandas as pd
 import nibabel as nib
 from ipdb import set_trace
+from time import time
 from skimage.transform import resize
 from nilearn import plotting
 import nibabel as nib
@@ -11,6 +12,7 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from torch.autograd import Variable
+import pytorch_ssim
 
 
 
@@ -31,7 +33,8 @@ def load_checkpoint(G, D, E, CD, fname, path='checkpoint'):
                 highest_pth = max(highest_pth, curr_num)
         if files:
             D.load_state_dict(torch.load(f'./{path}/D{fname}{highest_pth}.pth'))
-            CD.load_state_dict(torch.load(f'./{path}/CD{fname}{highest_pth}.pth'))
+            if CD:
+                CD.load_state_dict(torch.load(f'./{path}/CD{fname}{highest_pth}.pth'))
             E.load_state_dict(torch.load(f'./{path}/E{fname}{highest_pth}.pth'))
             G.load_state_dict(torch.load(f'./{path}/G{fname}{highest_pth}.pth'))
             iteration = highest_pth
@@ -39,8 +42,8 @@ def load_checkpoint(G, D, E, CD, fname, path='checkpoint'):
         os.mkdir(checkpoint_pth)
     
     return iteration
-
-def w_load_checkpoint(G, D, fname):
+            
+def w_egen(G, D, fname):
     # load the highest savepoints of all models
     iteration = 0
     checkpoint_pth = './vae_checkpoint/'
@@ -81,9 +84,10 @@ def vae_load_checkpoint(G, D, E, checkpoint_name='vae_checkpoint'):
     
     return iteration
 
-def load_loss(path='./checkpoint/loss.csv'):
-    if os.path.exists(path):
-        return pd.read_csv(path)
+def load_loss(path='checkpoint'):
+    loss_pth = f'./{path}/loss.csv'
+    if os.path.exists(loss_pth):
+        return pd.read_csv(loss_pth)
     else:
         return pd.DataFrame()
 
@@ -229,15 +233,51 @@ def viz_all_imgs(path, count):
         elif os.path.isdir(f'{path}/{f}'):
             viz_all_imgs(f'{path}/{f}', count)
 
+def read_mmd(path='test_data'):
+    # return the last index
+    df = load_csv(f'./{path}/mmd.csv')
+    return int(df.iloc[-1]['index'])
 
+def calc_ssim(G, index, path, no_write=True, gpu=0):
+    df = load_csv(f'./{path}/ssim.csv')
+    if len(df):
+        last_ssim = int(df.iloc[-1]['index'])
+        
+    sum_ssim = 0
+    for i in range(1000):
+        noise = Variable(torch.randn((2, 1000)).cuda(gpu))
+        images = G(noise)
+        img1 = images[0]
+        img2 = images[1]
+
+        msssim = pytorch_ssim.msssim_3d(img1,img2)
+        sum_ssim = sum_ssim+msssim
+#         if i % 100 == 0:
+#             print(sum_ssim/1000)
+    ssim = sum_ssim/1000
+    print(f'final ssim: {ssim}')
+    
+    df = df.append(pd.DataFrame({
+        'index': [index],
+        'ssim': [float(ssim)]
+    }))
+    if not no_write:
+        df.to_csv(f'./{path}/ssim.csv', index=False)
+        
+    return ssim
+    
+    
 def calc_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=None, path='test_data', var=1):
     for p in G.parameters():
         p.requires_grad = False
     if not os.path.exists(f'./{path}'):
         os.mkdir(f'./{path}')
     df = load_csv(f'./{path}/mmd.csv')
+    total_mean = []
+    
     for s in range(0, count):
         distmean = 0
+        start_time = time()
         for i,(y) in enumerate(train_loader):
             y = y.cuda(gpu_ind)
             if E:
@@ -257,19 +297,21 @@ def calc_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=N
             Dist = beta * (torch.sum(xx)+torch.sum(yy)) - gamma * torch.sum(zz)
             distmean += Dist.item()
         mean = (distmean/(i+1))
-        print(f'\nCount: {iteration} Mean: {mean}')
-        
-        if not no_write:
-            # write scores to csv
-            df = df.append(pd.DataFrame({
-                'index': [iteration],
-                'mmd_score': [mean]
-            }))
-            df.to_csv(f'./{path}/mmd.csv', index=False)
-        torch.cuda.empty_cache()   
+        total_mean.append(mean)
+        print(f'\niteration: {iteration}, count: {s}, Mean: {mean}, cost {time() - start_time} seconds')
     
-    meanarr = np.array(df.iloc[:]['mmd_score'].tolist())
-#     print('Total_mean:'+str(np.mean(meanarr))+' STD:'+str(np.std(meanarr)))
+    total_mean = np.array(total_mean)
+    final_mean = np.mean(total_mean)
+    final_std = np.std(total_mean)
+    # write scores to csv
+    df = df.append(pd.DataFrame({
+        'index': [iteration],
+        'mmd_score': [mean],
+        'std': [final_std]
+    }))
+    if not no_write:
+        df.to_csv(f'./{path}/mmd.csv', index=False)
+    print('Total_mean:'+str(final_mean)+' STD:'+str(final_std))
 
 def calc_gradient_penalty(model, x, x_gen, w=10, cuda_ind=0):
     _eps = 1e-15
