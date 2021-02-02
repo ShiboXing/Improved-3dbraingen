@@ -20,6 +20,12 @@ sp_size = 64
 arr1 = [4,6,8,10,12,14,16,18,20,22,24,26,28,30,32]
 arr2 = [34,36,38,40,42,44,46,48,50,52,54,56,58,60]
 
+
+def inf_train_gen(data_loader):
+    while True:
+        for _,images in enumerate(data_loader):
+            yield torch.tensor(images, requires_grad=False)
+
 def load_checkpoint(G, D, E, CD, fname, path='checkpoint'):
     # load the highest savepoints of all models
     iteration = 0
@@ -170,13 +176,6 @@ def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, is_vae
         plt.scatter(real_PCs[:, 0], real_PCs[:, 1])
     plt.show()
     
-    
-
-        
-def inf_train_gen(data_loader):
-    while True:
-        for _,images in enumerate(data_loader):
-            yield images
 
 def viz_mmd():
     pass
