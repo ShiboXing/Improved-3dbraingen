@@ -24,7 +24,7 @@ arr2 = [34,36,38,40,42,44,46,48,50,52,54,56,58,60]
 def inf_train_gen(data_loader):
     while True:
         for _,images in enumerate(data_loader):
-            yield torch.tensor(images, requires_grad=False)
+            yield images
 
 def load_checkpoint(G, D, E, CD, fname, path='checkpoint'):
     # load the highest savepoints of all models
@@ -317,8 +317,15 @@ def calc_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=N
         df.to_csv(f'./{path}/mmd.csv', index=False)
     print('Total_mean:'+str(final_mean)+' STD:'+str(final_std))
 
-def calc_gradient_penalty(model, x, x_gen, w=10, cuda_ind=0):
+def eps_norm(x):
     _eps = 1e-15
+    x = x.view(len(x), -1)
+    return (x*x+_eps).sum(-1).sqrt()
+
+def bi_penalty(x):
+    return (x-1)**2
+
+def calc_gradient_penalty(model, x, x_gen, w=10, cuda_ind=0):
     """WGAN-GP gradient penalty"""
     assert x.size()==x_gen.size(), "real and sampled sizes do not match"
     alpha_size = tuple((len(x), *(1,)*(x.dim()-1)))
@@ -328,11 +335,7 @@ def calc_gradient_penalty(model, x, x_gen, w=10, cuda_ind=0):
     x_hat = x*alpha + x_gen*(1-alpha)
     x_hat = Variable(x_hat, requires_grad=True)
 
-    def eps_norm(x):
-        x = x.view(len(x), -1)
-        return (x*x+_eps).sum(-1).sqrt()
-    def bi_penalty(x):
-        return (x-1)**2
+    
     grad_xhat = torch.autograd.grad(model(x_hat).sum(), x_hat, create_graph=True, only_inputs=True)[0]
 
     penalty = w*bi_penalty(eps_norm(grad_xhat)).mean()
