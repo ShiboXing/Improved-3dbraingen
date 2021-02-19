@@ -10,8 +10,9 @@ from ipdb import set_trace
 #Encoder and Discriminator has same architecture
 #***********************************************
 class Discriminator(nn.Module):
-    def __init__(self, channel=512,out_class=1,is_dis =True, img_size=64):
+    def __init__(self, channel=512,out_class=1,is_dis =True, img_size=64, useBatchNorm=True):
         super(Discriminator, self).__init__()
+        self.useBatchNorm = useBatchNorm
         self.img_size = img_size
         self.is_dis = is_dis
         self.channel = channel
@@ -29,9 +30,15 @@ class Discriminator(nn.Module):
         
     def forward(self, x, _return_activations=False):
         h1 = F.leaky_relu(self.conv1(x), negative_slope=0.2)
-        h2 = F.leaky_relu(self.bn2(self.conv2(h1)), negative_slope=0.2)
-        h3 = F.leaky_relu(self.bn3(self.conv3(h2)), negative_slope=0.2)
-        h4 = F.leaky_relu(self.bn4(self.conv4(h3)), negative_slope=0.2)
+        if self.useBatchNorm:
+            h2 = F.leaky_relu(self.bn2(self.conv2(h1)), negative_slope=0.2)
+            h3 = F.leaky_relu(self.bn3(self.conv3(h2)), negative_slope=0.2)
+            h4 = F.leaky_relu(self.bn4(self.conv4(h3)), negative_slope=0.2)
+        else:
+            h2 = F.leaky_relu(self.conv2(h1), negative_slope=0.2)
+            h3 = F.leaky_relu(self.conv3(h2), negative_slope=0.2)
+            h4 = F.leaky_relu(self.conv4(h3), negative_slope=0.2)
+        
         h5 = self.conv5(h4)
         return h5
     

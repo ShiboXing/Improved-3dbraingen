@@ -8,6 +8,7 @@ from skimage.transform import resize
 from nilearn import plotting
 import nibabel as nib
 import numpy as np
+from scipy.linalg import sqrtm
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -25,6 +26,22 @@ def inf_train_gen(data_loader):
     while True:
         for _,images in enumerate(data_loader):
             yield images
+            
+# calculate frechet inception distance 
+def calculate_fid(act1, act2, cuda_ind=0):
+	# calculate mean and covariance statistics
+	mu1, sigma1 = act1.mean(axis=0), np.cov(act1, rowvar=False)
+	mu2, sigma2 = act2.mean(axis=0), np.cov(act2, rowvar=False)
+	# calculate sum squared difference between means/
+	ssdiff = np.sum((mu1 - mu2)**2.0)
+	# calculate sqrt of product between cov
+	covmean = sqrtm(sigma1.dot(sigma2)) 
+	# check and correct imaginary numbers from sqrt
+	if np.iscomplexobj(covmean):
+		covmean = covmean.real
+	# calculate score
+	fid = ssdiff + np.trace(sigma1 + sigma2 - 2.0 * covmean)
+	return fid
 
 def load_checkpoint(G, D, E, CD, fname, path='checkpoint'):
     # load the highest savepoints of all models
