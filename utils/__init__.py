@@ -177,7 +177,7 @@ def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, is_vae
     yellow_mean = real_df.mean(1).mean(0)
     blue_var = sample_df.var(1).mean(0)
     yellow_var = real_df.var(1).mean(0)
-    print(f'index: {index}, sample_mean: {blue_mean} sample_var: {blue_var}, yellow_mean: {yellow_mean} yellow_var: {yellow_var}')
+    print(f'index: {index}, sample_mean (blue): {blue_mean} sample_var: {blue_var}, real_mean (yellow): {yellow_mean} real_var: {yellow_var}')
     if is_cd:
         plt.title('latent vector PCA (blue is z_e)')
     else:
@@ -252,21 +252,19 @@ def viz_all_imgs(path, count):
         elif os.path.isdir(f'{path}/{f}'):
             viz_all_imgs(f'{path}/{f}', count)
 
-def read_mmd(path='test_data'):
+def read_mmd(path='test_data', name='mmd.csv'):
     # return the last index
-    df = load_csv(f'./{path}/mmd.csv')
+    if not os.path.exists(f'./{path}/{name}'):
+        return 0
+    df = load_csv(f'./{path}/{name}')
     return int(df.iloc[-1]['index'])
 
-def calc_ssim(G, index, path, no_write=True, gpu=0):
+def read_ssim(path='test_data'):
     df = load_csv(f'./{path}/ssim.csv')
-    if len(df):
-        last_ssim = int(df.iloc[-1]['index'])
-        if 'vae' in path:
-            G.load_state_dict(torch.load(f'./{path}/G_VG_ep_{last_ssim+1}.pth'))
-        else:
-            G.load_state_dict(torch.load(f'./{path}/G_iter{last_ssim + 1000}.pth'))
-            
-        
+    last_ssim = int(df.iloc[-1]['index']) if len(df) else 0 
+    return last_ssim
+
+def calc_ssim(G, index, path, no_write=True, gpu=0):        
     sum_ssim = 0
     for i in range(1000):
         noise = Variable(torch.randn((2, 1000)).cuda(gpu))
@@ -279,8 +277,8 @@ def calc_ssim(G, index, path, no_write=True, gpu=0):
 #         if i % 100 == 0:
 #             print(sum_ssim/1000)
     ssim = sum_ssim/1000
-    print(f'final ssim: {ssim}')
-    
+    print(f'{index} final ssim: {ssim}')
+    df = load_csv(f'./{path}/ssim.csv')
     df = df.append(pd.DataFrame({
         'index': [index],
         'ssim': [float(ssim)]
@@ -291,12 +289,78 @@ def calc_ssim(G, index, path, no_write=True, gpu=0):
     return ssim
     
     
-def calc_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=None, path='test_data', var=1):
+def calc_mmd(train_loader, G, iteration, count=1, no_write=False, mode='rbf', gpu_ind=1, E=None, path='test_data', var=1):
+    
     for p in G.parameters():
         p.requires_grad = False
     if not os.path.exists(f'./{path}'):
         os.mkdir(f'./{path}')
-    df = load_csv(f'./{path}/mmd.csv')
+    df = load_csv(f'./{path}/{mode}_mmd.csv')
+    total_mean = []
+    
+    for s in range(0, count):
+        distmean = 0
+        start_time = time()
+        for i,(y) in enumerate(train_loader):
+            B = y.size(0)
+            y = y.cuda(gpu_ind).view(B, -1)
+            if E:
+                noise = E(y).cuda(gpu_ind) 
+            else:
+                noise = torch.randn(B, 1000).cuda(gpu_ind) * var
+            x = G(noise).view(B, -1)
+            
+            xx, yy, zz = torch.mm(x, x.t()), torch.mm(y, y.t()), torch.mm(x, y.t())
+            rx = (xx.diag().unsqueeze(0).expand_as(xx))
+            ry = (yy.diag().unsqueeze(0).expand_as(yy))
+            dxx = rx.t() + rx - 2. * xx 
+            dyy = ry.t() + ry - 2. * yy 
+            dxy = rx.t() + ry - 2. * zz 
+            XX, YY, XY = torch.zeros(xx.shape).cuda(gpu_ind), \
+            torch.zeros(xx.shape).cuda(gpu_ind), \
+            torch.zeros(xx.shape).cuda(gpu_ind)
+            
+            if mode == 'rbf':
+                bandwidth_range = [a * 1e+3 for a in [1, 1.5, 2, 5]]
+                for a in bandwidth_range:
+                    XX += torch.exp(-0.5*dxx/a)
+                    YY += torch.exp(-0.5*dyy/a)
+                    XY += torch.exp(-0.5*dxy/a)
+            elif mode == "multiscale":
+                bandwidth_range = [a * 1e+3 for a in [0.2, 0.5, 0.9, 1.3]]
+                for a in bandwidth_range:
+                    XX += a**2 * (a**2 + dxx)**-1
+                    YY += a**2 * (a**2 + dyy)**-1
+                    XY += a**2 * (a**2 + dxy)**-1
+            else:
+                print('unknown kernel')
+                break
+            
+            distmean += torch.mean(XX + YY - 2. * XY)
+            
+        mean = (distmean/(i+1))
+        total_mean.append(mean.item())
+        print(f'\niteration: {iteration}, count: {s}, Mean: {mean}, cost {time() - start_time} seconds')
+    
+    total_mean = np.array(total_mean)
+    final_mean = np.mean(total_mean)
+    final_std = np.std(total_mean)
+    # write scores to csv
+    df = df.append(pd.DataFrame({
+        'index': [iteration],
+        'mmd_score': [final_mean],
+        'std': [final_std]
+    }))
+    if not no_write:
+        df.to_csv(f'./{path}/{mode}_mmd.csv', index=False)
+    print('Total_mean:'+str(final_mean)+' STD:'+str(final_std))
+
+def calc_old_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=None, path='test_data', var=1):
+    for p in G.parameters():
+        p.requires_grad = False
+    if not os.path.exists(f'./{path}'):
+        os.mkdir(f'./{path}')
+    df = load_csv(f'./{path}/old_mmd.csv')
     total_mean = []
     
     for s in range(0, count):
@@ -304,11 +368,9 @@ def calc_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=N
         start_time = time()
         for i,(y) in enumerate(train_loader):
             y = y.cuda(gpu_ind)
-            if E:
-                noise = E(y).cuda(gpu_ind) 
-            else:
-                noise = torch.randn(y.size(0), 1000).cuda(gpu_ind) * var
+            noise = torch.randn((y.size(0), 1000)).cuda(gpu_ind)
             x = G(noise)
+
             B = y.size(0)
             x = x.view(x.size(0), x.size(2) * x.size(3)*x.size(4))
             y = y.view(y.size(0), y.size(2) * y.size(3)*y.size(4))
@@ -319,9 +381,9 @@ def calc_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=N
             gamma = (2./(B*B)) 
 
             Dist = beta * (torch.sum(xx)+torch.sum(yy)) - gamma * torch.sum(zz)
-            distmean += Dist.item()
+            distmean += Dist
         mean = (distmean/(i+1))
-        total_mean.append(mean)
+        total_mean.append(mean.item())
         print(f'\niteration: {iteration}, count: {s}, Mean: {mean}, cost {time() - start_time} seconds')
     
     total_mean = np.array(total_mean)
@@ -330,11 +392,11 @@ def calc_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=N
     # write scores to csv
     df = df.append(pd.DataFrame({
         'index': [iteration],
-        'mmd_score': [mean],
+        'mmd_score': [final_mean],
         'std': [final_std]
     }))
     if not no_write:
-        df.to_csv(f'./{path}/mmd.csv', index=False)
+        df.to_csv(f'./{path}/old_mmd.csv', index=False)
     print('Total_mean:'+str(final_mean)+' STD:'+str(final_std))
 
 def eps_norm(x):
