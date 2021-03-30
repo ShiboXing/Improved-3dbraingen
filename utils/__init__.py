@@ -129,7 +129,7 @@ def add_loss(df, loss_dict):
 def write_loss(df, path='checkpoint'):
     df.to_csv(f'./{path}/loss.csv', index=False)
     
-def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, is_vae=False, viz_fake=True, viz_real=True, index=0, gpu_ind=0):
+def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, is_vae=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0):
     sample_df = pd.DataFrame()
     real_df = pd.DataFrame()
     
@@ -143,7 +143,7 @@ def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, is_vae
         pass
     
     for s in range(512):
-        noise = torch.randn((1, latent_size)).cuda(gpu_ind)
+        noise = (torch.randn((1, latent_size)) * z_r).cuda(gpu_ind)
         if not is_cd:
             real = gen_load.__next__().cuda(gpu_ind) if batch_size == 1 else torch.unsqueeze(gen_load.__next__().cuda(gpu_ind)[0], 1)
             fake = np.squeeze(model(noise)).view(1, -1)
@@ -264,10 +264,10 @@ def read_ssim(path='test_data'):
     last_ssim = int(df.iloc[-1]['index']) if len(df) else 0 
     return last_ssim
 
-def calc_ssim(G, index, path, no_write=True, gpu=0):        
+def calc_ssim(G, index, path, no_write=True, gpu=0, z_r=1):        
     sum_ssim = 0
     for i in range(1000):
-        noise = Variable(torch.randn((2, 1000)).cuda(gpu))
+        noise = (torch.randn((2, 1000)) * z_r).cuda(gpu)
         images = G(noise)
         img1 = images[0]
         img2 = images[1]
@@ -289,7 +289,7 @@ def calc_ssim(G, index, path, no_write=True, gpu=0):
     return ssim
     
     
-def calc_mmd(train_loader, G, iteration, count=1, no_write=False, mode='rbf', gpu_ind=1, E=None, path='test_data', var=1):
+def calc_mmd(train_loader, G, iteration, count=1, no_write=False, mode='rbf', gpu_ind=1, E=None, path='test_data', var=1, z_r=1):
     
     for p in G.parameters():
         p.requires_grad = False
@@ -307,7 +307,7 @@ def calc_mmd(train_loader, G, iteration, count=1, no_write=False, mode='rbf', gp
             if E:
                 noise = E(y).cuda(gpu_ind) 
             else:
-                noise = torch.randn(B, 1000).cuda(gpu_ind) * var
+                noise = (torch.randn(B, 1000) * z_r).cuda(gpu_ind) * var
             x = G(noise).view(B, -1)
             
             xx, yy, zz = torch.mm(x, x.t()), torch.mm(y, y.t()), torch.mm(x, y.t())
@@ -331,7 +331,7 @@ def calc_mmd(train_loader, G, iteration, count=1, no_write=False, mode='rbf', gp
                 for a in bandwidth_range:
                     XX += a**2 * (a**2 + dxx)**-1
                     YY += a**2 * (a**2 + dyy)**-1
-                    XY += a**2 * (a**2 + dxy)**-1
+                    XY += a**2 * (a**2 + dxy)**-1 
             else:
                 print('unknown kernel')
                 break
@@ -355,7 +355,7 @@ def calc_mmd(train_loader, G, iteration, count=1, no_write=False, mode='rbf', gp
         df.to_csv(f'./{path}/{mode}_mmd.csv', index=False)
     print('Total_mean:'+str(final_mean)+' STD:'+str(final_std))
 
-def calc_old_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=None, path='test_data', var=1):
+def calc_old_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=None, path='test_data', var=1, z_r=1):
     for p in G.parameters():
         p.requires_grad = False
     if not os.path.exists(f'./{path}'):
@@ -368,7 +368,7 @@ def calc_old_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1,
         start_time = time()
         for i,(y) in enumerate(train_loader):
             y = y.cuda(gpu_ind)
-            noise = torch.randn((y.size(0), 1000)).cuda(gpu_ind)
+            noise = (torch.randn((y.size(0), 1000)) * z_r).cuda(gpu_ind)
             x = G(noise)
 
             B = y.size(0)
