@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from torch.autograd import Variable
+from .tsne import tsne
 import pytorch_ssim
 
 
@@ -129,7 +130,7 @@ def add_loss(df, loss_dict):
 def write_loss(df, path='checkpoint'):
     df.to_csv(f'./{path}/loss.csv', index=False)
     
-def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, is_vae=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0):
+def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False, is_cd=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0):
     sample_df = pd.DataFrame()
     real_df = pd.DataFrame()
     
@@ -182,22 +183,31 @@ def viz_pca(model, trainset, batch_size=1, latent_size=1000, is_cd=False, is_vae
         plt.title('latent vector PCA (blue is z_e)')
     else:
         plt.title('X PCA (blue is X_rand)')
+       
+    
+    pca = PCA(n_components=2)
+    
     if viz_fake:
-        # PCA of fake images
-        pca = PCA(n_components=2)
-        samples = StandardScaler().fit_transform(sample_df)
-        PCs = pca.fit_transform(sample_df)
-        plt.scatter(PCs[:, 0], PCs[:, 1])
+        if is_tsne:
+            fakes = sample_df.values
+            fakes = tsne(fake, 2, fake.shape[1], 20)
+        else:
+            fakes = StandardScaler().fit_transform(sample_df)
+            fakes = pca.fit_transform(sample_df)
+        plt.scatter(fakes[:, 0], fakes[:, 1])
         
     if viz_real:
-        # PCA of real images
-        reals = StandardScaler().fit_transform(real_df)
-        real_PCs = pca.fit_transform(real_df)
-        plt.scatter(real_PCs[:, 0], real_PCs[:, 1])
+        if is_tsne:
+            reals = sample_df.values
+            reals = tsne(real, 2, fake.shape[1], 20)
+        else:
+            reals = StandardScaler().fit_transform(real_df)
+            reals = pca.fit_transform(real_df)
+        plt.scatter(reals[:, 0], reals[:, 1])
     plt.show()
-    
 
-def viz_mmd():
+
+def viz_tsne(X, Y):
     pass
 
 def latent_mmd(model, gen_load, num=1, batch_size=4, gpu_ind=0):
