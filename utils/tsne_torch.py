@@ -16,22 +16,23 @@ import matplotlib.pyplot as pyplot
 import argparse
 import torch
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--xfile", type=str, default="mnist2500_X.txt", help="file name of feature stored")
-parser.add_argument("--yfile", type=str, default="mnist2500_labels.txt", help="file name of label stored")
-parser.add_argument("--cuda", type=int, default=1, help="if use cuda accelarate")
+# parser = argparse.ArgumentParser()
+# parser.add_argument("--xfile", type=str, default="mnist2500_X.txt", help="file name of feature stored")
+# parser.add_argument("--yfile", type=str, default="mnist2500_labels.txt", help="file name of label stored")
+# parser.add_argument("--cuda", type=int, default=1, help="if use cuda accelarate")
 
-opt = parser.parse_args()
-print("get choice from args", opt)
-xfile = opt.xfile
-yfile = opt.yfile
+# opt = parser.parse_args()
+# print("get choice from args", opt)
+# xfile = opt.xfile
+# yfile = opt.yfile
 
-if opt.cuda:
-    print("set use cuda")
-    torch.set_default_tensor_type(torch.cuda.DoubleTensor)
-else:
-    torch.set_default_tensor_type(torch.DoubleTensor)
+# if opt.cuda:
+#     print("set use cuda")
+#     torch.set_default_tensor_type(torch.cuda.DoubleTensor)
+# else:
+#     torch.set_default_tensor_type(torch.DoubleTensor)
 
+gpu = 0
 
 def Hbeta_torch(D, beta=1.0):
     P = torch.exp(-D.clone() * beta)
@@ -57,9 +58,9 @@ def x2p_torch(X, tol=1e-5, perplexity=30.0):
     sum_X = torch.sum(X*X, 1)
     D = torch.add(torch.add(-2 * torch.mm(X, X.t()), sum_X).t(), sum_X)
 
-    P = torch.zeros(n, n)
-    beta = torch.ones(n, 1)
-    logU = torch.log(torch.tensor([perplexity]))
+    P = torch.zeros(n, n).cuda(gpu)
+    beta = torch.ones(n, 1).cuda(gpu)
+    logU = torch.log(torch.tensor([perplexity]).cuda(gpu).double())
     n_list = [i for i in range(n)]
 
     # Loop over all datapoints
@@ -78,7 +79,7 @@ def x2p_torch(X, tol=1e-5, perplexity=30.0):
         (H, thisP) = Hbeta_torch(Di, beta[i])
 
         # Evaluate whether the perplexity is within tolerance
-        Hdiff = H - logU
+        Hdiff = H.double() - logU
         tries = 0
         while torch.abs(Hdiff) > tol and tries < 50:
 
@@ -99,7 +100,7 @@ def x2p_torch(X, tol=1e-5, perplexity=30.0):
             # Recompute the values
             (H, thisP) = Hbeta_torch(Di, beta[i])
 
-            Hdiff = H - logU
+            Hdiff = H.double() - logU
             tries += 1
 
         # Set the final row of P
@@ -117,7 +118,7 @@ def pca_torch(X, no_dims=50):
     (l, M) = torch.eig(torch.mm(X.t(), X), True)
     # split M real
     for i in range(d):
-        if l[i, 1] != 0:
+        if l[i, 1] != 0 and i < d - 1:
             M[:, i+1] = M[:, i]
             i += 1
 
@@ -125,13 +126,14 @@ def pca_torch(X, no_dims=50):
     return Y
 
 
-def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0):
+def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0, gpu_ind=0):
     """
         Runs t-SNE on the dataset in the NxD array X to reduce its
         dimensionality to no_dims dimensions. The syntaxis of the function is
         `Y = tsne.tsne(X, no_dims, perplexity), where X is an NxD NumPy array.
     """
 
+    gpu = gpu_ind
     # Check inputs
     if isinstance(no_dims, float):
         print("Error: array X should not have type float.")
@@ -141,17 +143,17 @@ def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0):
         return -1
 
     # Initialize variables
-    X = pca_torch(X, initial_dims)
+    X = pca_torch(X.cuda(gpu), initial_dims)
     (n, d) = X.shape
     max_iter = 1000
     initial_momentum = 0.5
     final_momentum = 0.8
     eta = 500
     min_gain = 0.01
-    Y = torch.randn(n, no_dims)
-    dY = torch.zeros(n, no_dims)
-    iY = torch.zeros(n, no_dims)
-    gains = torch.ones(n, no_dims)
+    Y = torch.randn(n, no_dims).cuda(gpu).double()
+    dY = torch.zeros(n, no_dims).cuda(gpu).double()
+    iY = torch.zeros(n, no_dims).cuda(gpu).double()
+    gains = torch.ones(n, no_dims).cuda(gpu).double()
 
     # Compute P-values
     P = x2p_torch(X, 1e-5, perplexity)
@@ -159,7 +161,7 @@ def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0):
     P = P / torch.sum(P)
     P = P * 4.    # early exaggeration
     print("get P shape", P.shape)
-    P = torch.max(P, torch.tensor([1e-21]))
+    P = torch.max(P, torch.tensor([1e-21]).cuda(gpu)).double()
 
     # Run iterations
     for iter in range(max_iter):
@@ -170,7 +172,7 @@ def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0):
         num = 1. / (1. + torch.add(torch.add(num, sum_Y).t(), sum_Y))
         num[range(n), range(n)] = 0.
         Q = num / torch.sum(num)
-        Q = torch.max(Q, torch.tensor([1e-12]))
+        Q = torch.max(Q, torch.tensor([1e-12]).cuda(gpu).double())
 
         # Compute gradient
         PQ = P - Q
@@ -190,7 +192,7 @@ def tsne(X, no_dims=2, initial_dims=50, perplexity=30.0):
         Y = Y - torch.mean(Y, 0)
 
         # Compute current value of cost function
-        if (iter + 1) % 10 == 0:
+        if (iter + 1) % 1000 == 0 or iter < 10:
             C = torch.sum(P * torch.log(P / Q))
             print("Iteration %d: error is %f" % (iter + 1, C))
 

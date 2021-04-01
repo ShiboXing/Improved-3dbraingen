@@ -12,12 +12,11 @@ import cupy as cp
 from scipy.linalg import sqrtm
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 from torch.autograd import Variable
-from .tsne import tsne
+from .tsne_torch import tsne
 import pytorch_ssim
-
-
 
 sp_size = 64
 arr1 = [4,6,8,10,12,14,16,18,20,22,24,26,28,30,32]
@@ -130,7 +129,7 @@ def add_loss(df, loss_dict):
 def write_loss(df, path='checkpoint'):
     df.to_csv(f'./{path}/loss.csv', index=False)
     
-def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False, is_cd=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0):
+def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False, is_cd=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0, perplexity=30):
     sample_df = pd.DataFrame()
     real_df = pd.DataFrame()
     
@@ -189,8 +188,9 @@ def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False,
     
     if viz_fake:
         if is_tsne:
-            fakes = sample_df.values
-            fakes = tsne(fake, 2, fake.shape[1], 20)
+#             fakes = torch.Tensor(sample_df.values).cuda(gpu_ind)
+            fakes = TSNE(n_components=2).fit_transform(sample_df.values)
+#             fakes = tsne(fakes, 2, fakes.shape[1], perplexity, gpu_ind=gpu_ind).cpu() 
         else:
             fakes = StandardScaler().fit_transform(sample_df)
             fakes = pca.fit_transform(sample_df)
@@ -198,8 +198,9 @@ def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False,
         
     if viz_real:
         if is_tsne:
-            reals = sample_df.values
-            reals = tsne(real, 2, fake.shape[1], 20)
+#             reals = torch.Tensor(real_df.values).cuda(gpu_ind)
+            reals = TSNE(n_components=2).fit_transform(real_df.values)
+#             reals = tsne(reals, 2, reals.shape[1], perplexity, gpu_ind=gpu_ind).cpu()
         else:
             reals = StandardScaler().fit_transform(real_df)
             reals = pca.fit_transform(real_df)
