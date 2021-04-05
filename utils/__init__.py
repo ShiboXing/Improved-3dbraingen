@@ -58,9 +58,10 @@ def load_checkpoint(G, D, E, CD, fname, path='checkpoint'):
                 curr_num = int(s.split('iter')[1].split('.')[0])
                 highest_pth = max(highest_pth, curr_num)
         if files:
-            D.load_state_dict(torch.load(f'./{path}/D{fname}{highest_pth}.pth'))
             if CD:
                 CD.load_state_dict(torch.load(f'./{path}/CD{fname}{highest_pth}.pth'))
+            if D:
+                D.load_state_dict(torch.load(f'./{path}/D{fname}{highest_pth}.pth'))
             E.load_state_dict(torch.load(f'./{path}/E{fname}{highest_pth}.pth'))
             G.load_state_dict(torch.load(f'./{path}/G{fname}{highest_pth}.pth'))
             iteration = highest_pth
@@ -129,7 +130,7 @@ def add_loss(df, loss_dict):
 def write_loss(df, path='checkpoint'):
     df.to_csv(f'./{path}/loss.csv', index=False)
     
-def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False, is_cd=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0, perplexity=30):
+def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False, is_pca=True, is_cd=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0, perplexity=30):
     sample_df = pd.DataFrame()
     real_df = pd.DataFrame()
     
@@ -185,9 +186,11 @@ def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False,
        
     
     pca = PCA(n_components=2)
-    
     if viz_fake:
-        if is_tsne:
+        if is_tsne and is_pca:
+            fakes = TSNE(n_components=50, method='exact').fit_transform(sample_df.values)
+            fakes = pca.fit_transform(sample_df)
+        elif is_tsne:
 #             fakes = torch.Tensor(sample_df.values).cuda(gpu_ind)
             fakes = TSNE(n_components=2).fit_transform(sample_df.values)
 #             fakes = tsne(fakes, 2, fakes.shape[1], perplexity, gpu_ind=gpu_ind).cpu() 
@@ -197,7 +200,10 @@ def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False,
         plt.scatter(fakes[:, 0], fakes[:, 1])
         
     if viz_real:
-        if is_tsne:
+        if is_tsne and is_pca:
+            reals = TSNE(n_components=50, method='exact').fit_transform(real_df.values)
+            reals = pca.fit_transform(real_df)
+        elif is_tsne:
 #             reals = torch.Tensor(real_df.values).cuda(gpu_ind)
             reals = TSNE(n_components=2).fit_transform(real_df.values)
 #             reals = tsne(reals, 2, reals.shape[1], perplexity, gpu_ind=gpu_ind).cpu()
@@ -420,7 +426,8 @@ def bi_penalty(x):
 
 def calc_gradient_penalty(model, x, x_gen, w=10, cuda_ind=0):
     """WGAN-GP gradient penalty"""
-    assert x.size()==x_gen.size(), "real and sampled sizes do not match"
+    if not x.size()==x_gen.size():
+        return 0
     alpha_size = tuple((len(x), *(1,)*(x.dim()-1)))
     alpha_t = torch.cuda.FloatTensor if x.is_cuda else torch.Tensor
     alpha = alpha_t(*alpha_size).uniform_().cuda(cuda_ind)
