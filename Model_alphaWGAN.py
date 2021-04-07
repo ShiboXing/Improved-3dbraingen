@@ -10,7 +10,7 @@ from ipdb import set_trace
 #Encoder and Discriminator has same architecture
 #***********************************************
 class Discriminator(nn.Module):
-    def __init__(self, channel=512,out_class=1,is_dis =True, img_size=64, useBatchNorm=True):
+    def __init__(self, channel=512,out_class=1, is_dis=True, img_size=64, useBatchNorm=True):
         super(Discriminator, self).__init__()
         self.useBatchNorm = useBatchNorm
         self.img_size = img_size

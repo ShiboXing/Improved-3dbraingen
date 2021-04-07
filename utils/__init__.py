@@ -130,13 +130,13 @@ def add_loss(df, loss_dict):
 def write_loss(df, path='checkpoint'):
     df.to_csv(f'./{path}/loss.csv', index=False)
 
-def sample_from_model(model, gen_load, gpu_ind, latent_size, z_r, is_E, is_real=False):
+def sample_from_model(model, gen_load, gpu_ind, latent_size, batch_size, z_r, is_E, is_real=False):
     sample_df = pd.DataFrame()
     for s in range(512):
-        noise = (torch.randn((1, latent_size)) * z_r).cuda(gpu_ind) # get z_r * scale
+        noise = (torch.randn((batch_size, latent_size)) * z_r).cuda(gpu_ind) # get z_r * scale
         real = gen_load.__next__().cuda(gpu_ind) # get real_image sample
         if is_E: # sample for Z space
-            if is_real: sample = torch.randn((1, latent_size)).cuda(gpu_ind)
+            if is_real: sample = torch.randn((batch_size, latent_size)).cuda(gpu_ind)
             else: 
                 sample = model(real)
                 sample = sample if type(sample) != tuple else sample[2] # guard for vae_gan
@@ -146,7 +146,7 @@ def sample_from_model(model, gen_load, gpu_ind, latent_size, z_r, is_E, is_real=
         sample_df = sample_df.append(pd.DataFrame(sample.view(1, -1).cpu().detach().numpy()))
     return sample_df
 
-def pca_tsne(sample_df, is_tsne, is_pca):
+def pca_tsne(sample_df, is_tsne, is_pca, color):
     pca = PCA(n_components=2)
     if is_tsne and is_pca: # tsne -> 50 -> pca ->2
         samples = TSNE(n_components=50, method='exact').fit_transform(sample_df.values)
@@ -156,53 +156,69 @@ def pca_tsne(sample_df, is_tsne, is_pca):
     else: # pca only
         samples = StandardScaler().fit_transform(sample_df)
         samples = pca.fit_transform(sample_df)
-    plt.scatter(samples[:, 0], samples[:, 1])
+    plt.scatter(samples[:, 0], samples[:, 1], color=color)
         
-def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False, is_pca=True, is_cd=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0, perplexity=30):
+def viz_pca_tsne(models:list, trainset, batch_size=2, latent_size=1000, is_tsne=False, is_pca=True, is_cd=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0, perplexity=30):
     #init 
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=4)
     gen_load = inf_train_gen(train_loader)
     if is_tsne and is_pca: title = 'TSNE-PCA'
     elif is_pca: title = 'PCA'
     else: title = 'TSNE'
-        
-    try:
-        if hasattr(model, 'set_gpu'): model.set_gpu(gpu_ind)
-    except AttributeError: pass
+    colors=['blue', 'red', 'green', 'orange']
+    plt.figure()
+    for model, c in zip(models, colors):
+        try:
+            if hasattr(model, 'set_gpu'): model.set_gpu(gpu_ind)
+        except AttributeError: pass
+        real_df = sample_from_model(model, gen_load, gpu_ind, latent_size, batch_size, z_r, is_cd, True)
+        sample_df = sample_from_model(model, gen_load, gpu_ind, latent_size, batch_size, z_r, is_cd, False)
 
-    real_df = sample_from_model(model, gen_load, gpu_ind, latent_size, z_r, is_cd, True)
-    sample_df = sample_from_model(model, gen_load, gpu_ind, latent_size, z_r, is_cd, False)
-    
-    # plot the variances of latent vectors
-    if is_cd:
-        sample_vars, real_vars = sample_df.transpose().var(axis=1).to_frame(), real_df.transpose().var(axis=1).to_frame()
-        plt.figure()
-        pd.concat([real_vars, sample_vars], axis=1)[[0,0]].plot()
-        plt.show()
-        
-    blue_mean, yellow_mean = sample_df.mean(1).mean(0), real_df.mean(1).mean(0)
-    blue_var, yellow_var = sample_df.var(1).mean(0), real_df.var(1).mean(0)
-    print(f'index: {index}, sample_mean (blue): {blue_mean} sample_var: {blue_var}, real_mean (yellow): {yellow_mean} real_var: {yellow_var}')
-    if is_cd: plt.title(f'latent vector {title} (blue is z_e)')
-    else: plt.title(f'X {title} (blue is X_rand)')
-    # execute PCA 
-    if viz_fake: pca_tsne(sample_df, is_tsne, is_pca)
-    if viz_real: pca_tsne(real_df, is_tsne, is_pca)
+        # plot the variances of latent vectors
+#         if is_cd:
+#             sample_vars, real_vars = sample_df.transpose().var(axis=1).to_frame(), real_df.transpose().var(axis=1).to_frame()
+#             plt.figure()
+#             pd.concat([real_vars, sample_vars], axis=1)[[0,0]].plot()
+#             plt.show()
+
+        blue_mean, yellow_mean = sample_df.mean(1).mean(0), real_df.mean(1).mean(0)
+        blue_var, yellow_var = sample_df.var(1).mean(0), real_df.var(1).mean(0)
+        print(f'index: {index}, sample_mean (blue): {blue_mean} sample_var: {blue_var}, real_mean (yellow): {yellow_mean} real_var: {yellow_var}')
+        if is_cd: plt.title(f'latent vector {title} (blue is z_e)')
+        else: plt.title(f'X {title} (blue is X_rand)')
+        # execute PCA 
+        if viz_fake: pca_tsne(sample_df, is_tsne, is_pca, c)
+    if viz_real: pca_tsne(real_df, is_tsne, is_pca, colors[-1])
     plt.show()
 
-def fetch_model(models, is_E=False, iteration=100000):
+def fetch_models(checkpoints, is_E=False, iteration=100000, latent_dim=1000, gpu=0):
     if is_E:
         from Model_VAEGAN import Encoder as VE
-        from Model_alphaGAN import Encoder as AE
+        from Model_alphaGAN import Discriminator as AE
     else:
         from Model_VAEGAN import Generator as VG
         from Model_alphaGAN import Generator as AG
-    
-    for m in models:
+        
+    model_list = []
+    for m in checkpoints:
+        set_trace()
         if 'vae' in m:
-            
-        
-        
+            if is_E:
+                model = VE(out_class = latent_dim).cuda(gpu)
+                model.load_state_dict(torch.load(f'./{m}/E_VG_ep_{int(iteration / 1000)}.pth')) 
+            else:
+                model = VG(noise=latent_dim).cuda(gpu)
+                model.load_state_dict(torch.load(f'./{m}/G_VG_ep_{int(iteration / 1000)}.pth')) 
+        else:
+            if is_E:
+                set_trace()
+                model = AE(out_class = latent_dim).cuda(gpu)
+                model.load_state_dict(torch.load(f'./{m}/E_iter{iteration}.pth')) 
+            else:
+                model = AG(noise = latent_dim).cuda(gpu)
+                model.load_state_dict(torch.load(f'./{m}/G_iter{iteration}.pth')) 
+        model_list.append(model)
+    return model_list
 
 def latent_mmd(model, gen_load, num=1, batch_size=4, gpu_ind=0):
     total, i = 0, 0
