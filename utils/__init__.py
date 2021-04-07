@@ -129,39 +129,54 @@ def add_loss(df, loss_dict):
 
 def write_loss(df, path='checkpoint'):
     df.to_csv(f'./{path}/loss.csv', index=False)
+
+def sample_from_model(model, gen_load, gpu_ind, latent_size, z_r, is_real=False):
+    sample_df = pd.DataFrame()
+    for s in range(512):
+        noise = (torch.randn((1, latent_size)) * z_r).cuda(gpu_ind)
+        if is_real:
+            sample = np.squeeze(gen_load.__next__().cuda(gpu_ind)).view(1, -1)
+        else:
+            sample = np.squeeze(model(noise)).view(1, -1)
+        sample_df = sample_df.append(pd.DataFrame(sample.cpu().detach().numpy()))
+    return sample_df
     
 def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False, is_pca=True, is_cd=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0, perplexity=30):
-    sample_df = pd.DataFrame()
-    real_df = pd.DataFrame()
-    
+    #init 
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=4)
     gen_load = inf_train_gen(train_loader)
-    
+    if is_tsne and is_pca:title = 'TSNE-PCA'
+    elif is_pca: title = 'PCA'
+    else: title = 'TSNE'
+        
     try:
         if hasattr(model, 'set_gpu'):
             model.set_gpu(gpu_ind)
     except AttributeError:
         pass
     
-    for s in range(512):
-        noise = (torch.randn((1, latent_size)) * z_r).cuda(gpu_ind)
-        if not is_cd:
-            real = gen_load.__next__().cuda(gpu_ind) if batch_size == 1 else torch.unsqueeze(gen_load.__next__().cuda(gpu_ind)[0], 1)
-            fake = np.squeeze(model(noise)).view(1, -1)
-            sample_df = sample_df.append(pd.DataFrame(fake.cpu().detach().numpy()))
-            real_df = real_df.append(pd.DataFrame(np.squeeze(real).view(1, -1).cpu().detach().numpy()))
-            plt.title('Images PCA (blue is fake)')
+#     for s in range(512):
+#         noise = (torch.randn((1, latent_size)) * z_r).cuda(gpu_ind)
+#         if not is_cd:
+#             real = gen_load.__next__().cuda(gpu_ind) if batch_size == 1 else torch.unsqueeze(gen_load.__next__().cuda(gpu_ind)[0], 1)
+#             fake = np.squeeze(model(noise)).view(1, -1)
+#             sample_df = sample_df.append(pd.DataFrame(fake.cpu().detach().numpy()))
+#             real_df = real_df.append(pd.DataFrame(np.squeeze(real).view(1, -1).cpu().detach().numpy()))
+#             plt.title(f'Images {title} (blue is fake)')
             
-        else:
-            real = gen_load.__next__().cuda(gpu_ind)
-            z_e = model(real)
-            # handle vae
-            if type(z_e) != tuple:
-                z_e = z_e.view(1, -1)
-            else:
-                z_e = z_e[2]
-            sample_df = sample_df.append(pd.DataFrame(z_e.cpu().detach().numpy()))
-            real_df = real_df.append(pd.DataFrame(noise.cpu().detach().numpy()))
+#         else:
+#             real = gen_load.__next__().cuda(gpu_ind)
+#             z_e = model(real)
+#             # handle vae
+#             if type(z_e) != tuple:
+#                 z_e = z_e.view(1, -1)
+#             else:
+#                 z_e = z_e[2]
+#             sample_df = sample_df.append(pd.DataFrame(z_e.cpu().detach().numpy()))
+#             real_df = real_df.append(pd.DataFrame(noise.cpu().detach().numpy()))
+
+    real_df = sample_from_model(model, gen_load, gpu_ind, latent_size, z_r, True)
+    sample_df = sample_from_model(model, gen_load, gpu_ind, latent_size, z_r, False)
     
     if is_cd:
 #         calculate the variance of the vector's entries
@@ -180,9 +195,9 @@ def viz_pca_tsne(model, trainset, batch_size=1, latent_size=1000, is_tsne=False,
     yellow_var = real_df.var(1).mean(0)
     print(f'index: {index}, sample_mean (blue): {blue_mean} sample_var: {blue_var}, real_mean (yellow): {yellow_mean} real_var: {yellow_var}')
     if is_cd:
-        plt.title('latent vector PCA (blue is z_e)')
+        plt.title(f'latent vector {title} (blue is z_e)')
     else:
-        plt.title('X PCA (blue is X_rand)')
+        plt.title(f'X {title} (blue is X_rand)')
        
     
     pca = PCA(n_components=2)
