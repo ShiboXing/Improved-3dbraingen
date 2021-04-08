@@ -140,6 +140,7 @@ def sample_from_model(model, gen_load, gpu_ind, latent_size, batch_size, z_r, is
             else: 
                 sample = model(real)
                 sample = sample if type(sample) != tuple else sample[2] # guard for vae_gan
+                set_trace()
         else: # sample for X space
             if is_real: sample = real
             else: sample = model(noise)
@@ -156,18 +157,18 @@ def pca_tsne(sample_df, is_tsne, is_pca, color):
     else: # pca only
         samples = StandardScaler().fit_transform(sample_df)
         samples = pca.fit_transform(sample_df)
-    plt.scatter(samples[:, 0], samples[:, 1], color=color)
+    plt.scatter(samples[:, 0], samples[:, 1], color=color, linewidths=0.5)
         
-def viz_pca_tsne(models:list, trainset, batch_size=2, latent_size=1000, is_tsne=False, is_pca=True, is_cd=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0, perplexity=30):
-    #init 
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=4)
-    gen_load = inf_train_gen(train_loader)
+def viz_pca_tsne(models:list, trainset, batch_size=1, latent_size=1000, is_tsne=False, is_pca=True, is_cd=False, viz_fake=True, viz_real=True, index=0, z_r=1, gpu_ind=0, perplexity=30):
     if is_tsne and is_pca: title = 'TSNE-PCA'
     elif is_pca: title = 'PCA'
     else: title = 'TSNE'
-    colors=['blue', 'red', 'green', 'orange']
+    colors=['blue', 'red', 'pink', 'green', 'orange']
     plt.figure()
     for model, c in zip(models, colors):
+        #init 
+        train_loader = torch.utils.data.DataLoader(trainset, batch_size=2 if model.__class__.__name__ == 'Encoder' else batch_size, shuffle=True, num_workers=4)
+        gen_load = inf_train_gen(train_loader)
         try:
             if hasattr(model, 'set_gpu'): model.set_gpu(gpu_ind)
         except AttributeError: pass
@@ -201,7 +202,6 @@ def fetch_models(checkpoints, is_E=False, iteration=100000, latent_dim=1000, gpu
         
     model_list = []
     for m in checkpoints:
-        set_trace()
         if 'vae' in m:
             if is_E:
                 model = VE(out_class = latent_dim).cuda(gpu)
@@ -211,8 +211,7 @@ def fetch_models(checkpoints, is_E=False, iteration=100000, latent_dim=1000, gpu
                 model.load_state_dict(torch.load(f'./{m}/G_VG_ep_{int(iteration / 1000)}.pth')) 
         else:
             if is_E:
-                set_trace()
-                model = AE(out_class = latent_dim).cuda(gpu)
+                model = AE(out_class = latent_dim, is_dis=False).cuda(gpu)
                 model.load_state_dict(torch.load(f'./{m}/E_iter{iteration}.pth')) 
             else:
                 model = AG(noise = latent_dim).cuda(gpu)
