@@ -244,7 +244,6 @@ def latent_mmd(model, gen_load, num=1, batch_size=4, gpu_ind=0):
     
     return mmd
         
-        
 def viz_all_imgs(path, count):
     output_dir = './imgs_visualization'
     if not os.path.exists(output_dir):
@@ -313,7 +312,6 @@ def calc_ssim(G, index, path, no_write=True, gpu=0, z_r=1):
         
     return ssim
     
-    
 def calc_mmd(train_loader, model, iteration, count=1, latent_size=1000, no_write=False, mode='rbf', gpu_ind=1, path='test_data'):
     
     for p in model.parameters(): p.requires_grad = False
@@ -379,50 +377,6 @@ def calc_mmd(train_loader, model, iteration, count=1, latent_size=1000, no_write
     }))
     if not no_write:
         df.to_csv(f'./{path}/{mode}_mmd.csv', index=False)
-    print('Total_mean:'+str(final_mean)+' STD:'+str(final_std))
-
-def calc_old_mmd(train_loader, G, iteration, count=1, no_write=False, gpu_ind=1, E=None, path='test_data', var=1, z_r=1):
-    for p in G.parameters():
-        p.requires_grad = False
-    if not os.path.exists(f'./{path}'):
-        os.mkdir(f'./{path}')
-    df = load_csv(f'./{path}/old_mmd.csv')
-    total_mean = []
-    
-    for s in range(0, count):
-        distmean = 0
-        start_time = time()
-        for i,(y) in enumerate(train_loader):
-            y = y.cuda(gpu_ind)
-            noise = (torch.randn((y.size(0), 1000)) * z_r).cuda(gpu_ind)
-            x = G(noise)
-
-            B = y.size(0)
-            x = x.view(x.size(0), x.size(2) * x.size(3)*x.size(4))
-            y = y.view(y.size(0), y.size(2) * y.size(3)*y.size(4))
-
-            xx, yy, zz = torch.mm(x,x.t()), torch.mm(y,y.t()), torch.mm(x,y.t())
-
-            beta = (1./(B*B))
-            gamma = (2./(B*B)) 
-
-            Dist = beta * (torch.sum(xx)+torch.sum(yy)) - gamma * torch.sum(zz)
-            distmean += Dist
-        mean = (distmean/(i+1))
-        total_mean.append(mean.item())
-        print(f'\niteration: {iteration}, count: {s}, Mean: {mean}, cost {time() - start_time} seconds')
-    
-    total_mean = np.array(total_mean)
-    final_mean = np.mean(total_mean)
-    final_std = np.std(total_mean)
-    # write scores to csv
-    df = df.append(pd.DataFrame({
-        'index': [iteration],
-        'mmd_score': [final_mean],
-        'std': [final_std]
-    }))
-    if not no_write:
-        df.to_csv(f'./{path}/old_mmd.csv', index=False)
     print('Total_mean:'+str(final_mean)+' STD:'+str(final_std))
 
 def eps_norm(x):
