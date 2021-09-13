@@ -29,12 +29,12 @@ class BRATSdataset(Dataset):
         path = os.path.join(self.root,self.imglist[index])
         
         img = nib.load(os.path.join(path,self.imglist[index]+'_'+self.imgtype+'.nii.gz'))
-        gt = nib.load(os.path.join(path,self.imglist[index])+'_'+'seg.nii.gz')
+#         gt = nib.load(os.path.join(path,self.imglist[index])+'_'+'seg.nii.gz')
 
         A = np.zeros((240,240,166))
-        G = np.zeros((240,240,166))
+#         G = np.zeros((240,240,166))
         A[:,:,11:] = img.get_data()
-        G[:,:,11:] = gt.get_data()
+#         G[:,:,11:] = gt.get_data()
         x=[]
         y=[]
         z=[]
