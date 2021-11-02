@@ -188,20 +188,19 @@ def viz_pca_tsne(models:list, trainset, latent_size=1000, model_names=None, is_t
         blue_var, yellow_var = sample_df.var(1).mean(0), real_df.var(1).mean(0)
         print(f'index: {index}, sample_mean (blue): {blue_mean} sample_var:\
         {blue_var}, real_mean (yellow): {yellow_mean} real_var: {yellow_var}')
-#         plt.plot((real_df.mean(), sample_df.mean()))
         r, = plt.plot(range(len(real_df.var())), real_df.var(), label='real prior')
         s, = plt.plot(range(len(sample_df.var())), sample_df.var(), label='encoder')
         plt.legend(handles=[r, s])
         plt.show()
-#         if is_cd: plt.title(f'latent vector {title} (blue is z_e)')
-#         else: plt.title(f'X {title} (blue is X_rand)')
-#         # execute PCA
-#         name_str = f'{name}_E_PCA' if is_cd else f'{name}_G_PCA'
-#         pca_tsne(sample_df, is_tsne, is_pca, c, model_name=name_str)
-#     # execute PCA
-#     name_str = f'real_E_PCA' if is_cd else f'real_G_PCA'
-#     pca_tsne(real_df, is_tsne, is_pca, colors[-1], model_name=name_str)
-#     plt.show()
+        if is_cd: plt.title(f'latent vector {title} (blue is z_e)')
+        else: plt.title(f'X {title} (blue is X_rand)')
+        # execute PCA
+        name_str = f'{name}_E_PCA' if is_cd else f'{name}_G_PCA'
+        pca_tsne(sample_df, is_tsne, is_pca, c, model_name=name_str)
+    # execute PCA
+    name_str = f'real_E_PCA' if is_cd else f'real_G_PCA'
+    pca_tsne(real_df, is_tsne, is_pca, colors[-1], model_name=name_str)
+    plt.show()
 
 def fetch_models(checkpoints, is_E=False, iteration=100000, latent_dim=1000, gpu=0):
     if is_E:
