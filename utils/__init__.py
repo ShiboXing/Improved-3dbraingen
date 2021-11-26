@@ -147,20 +147,20 @@ def sample_from_model(model, gen_load, gpu_ind, latent_size, batch_size, z_r, is
     return sample_df
 
 def pca_tsne(sample_df, is_tsne, is_pca, color, model_name=None):
-    pca = PCA(n_components=2)
-    if is_tsne and is_pca: # PCA -> 50 -> TSNE ->2
-        pca = PCA(n_components=50)
-        samples = pca.fit_transform(sample_df)
-        samples = TSNE(n_components=2, method='exact').fit_transform(sample_df.values)
+    samples = StandardScaler().fit_transform(sample_df)
+    if is_tsne and is_pca: # TSNE -> 50 -> PCA ->2
+        samples = TSNE(n_components=50).fit_transform(sample_df.values)
+        samples = PCA(n_components=2).fit_transform(sample_df)
     elif is_tsne: # tsne only
         samples = TSNE(n_components=2).fit_transform(sample_df.values)
     else: # pca only
-        samples = StandardScaler().fit_transform(sample_df)
-        samples = pca.fit_transform(sample_df)
+        samples = PCA(n_components=2).fit_transform(sample_df)
+        
     pd.DataFrame(samples).to_csv(f'./{model_name}.csv', index=False)
     plt.scatter(samples[:, 0], samples[:, 1], color=color, linewidths=0.4)
         
 def viz_pca_tsne(models:list, trainset, latent_size=1000, model_names=None, is_tsne=False, is_pca=True, is_cd=False, index=0, z_r=1, gpu_ind=0, batch_size=8):
+    print(f'is_tsne: {is_tsne}, is_pca: {is_pca}')
     if is_tsne and is_pca: title = 'TSNE-PCA'
     elif is_pca: title = 'PCA'
     else: title = 'TSNE'
@@ -177,12 +177,11 @@ def viz_pca_tsne(models:list, trainset, latent_size=1000, model_names=None, is_t
         real_df = sample_from_model(model, gen_load, gpu_ind, latent_size, batch_size, z_r, is_cd, True)
         sample_df = sample_from_model(model, gen_load, gpu_ind, latent_size, batch_size, z_r, is_cd, False)
 
+        plt.figure()
 #         plot the variances of latent vectors
         if is_cd:
             sample_vars, real_vars = sample_df.transpose().var(axis=1).to_frame(), real_df.transpose().var(axis=1).to_frame()
-            plt.figure()
             val_df = pd.concat([real_vars, sample_vars], axis=1)
-            plt.show()
 
         blue_mean, yellow_mean = sample_df.mean(1).mean(0), real_df.mean(1).mean(0)
         blue_var, yellow_var = sample_df.var(1).mean(0), real_df.var(1).mean(0)
@@ -192,6 +191,7 @@ def viz_pca_tsne(models:list, trainset, latent_size=1000, model_names=None, is_t
         s, = plt.plot(range(len(sample_df.var())), sample_df.var(), label='encoder')
         plt.legend(handles=[r, s])
         plt.show()
+        
         if is_cd: plt.title(f'latent vector {title} (blue is z_e)')
         else: plt.title(f'X {title} (blue is X_rand)')
         # execute PCA
