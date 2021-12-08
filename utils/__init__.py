@@ -139,27 +139,26 @@ def sample_from_model(model, gen_load, gpu_ind, latent_size, batch_size, z_r, is
             if is_real: sample = torch.randn((batch_size, latent_size)).cuda(gpu_ind)
             else: 
                 sample = model(real if real.shape[0] == 2 else gen_load.__next__().cuda(gpu_ind)) # guard for vae_gan (needs 2 batches)
-                sample = sample if type(sample) != tuple else sample[2][0] # guard for vae_gan (3rd tensor, 2nd row vector)
+                sample = sample if type(sample) != tuple else sample[2] # guard for vae_gan (3rd tensor, 2nd row vector)
         else: # sample for X space
             if is_real: sample = real
             else: sample = model(noise)
         sample_df = sample_df.append(pd.DataFrame(sample.view(1, -1).cpu().detach().numpy()))
     return sample_df
 
-def pca_tsne(sample_df, is_tsne, is_pca, color, model_name=None):
+def pca_tsne(sample_df, is_tsne, is_pca, color, model_str='model'):
     samples = StandardScaler().fit_transform(sample_df)
     if is_tsne and is_pca: # TSNE -> 50 -> PCA ->2
-        samples = TSNE(n_components=50).fit_transform(sample_df.values)
+        samples = TSNE(n_components=50, method='exact').fit_transform(sample_df.values)
         samples = PCA(n_components=2).fit_transform(sample_df)
     elif is_tsne: # tsne only
-        samples = TSNE(n_components=2).fit_transform(sample_df.values)
+        samples = TSNE(n_components=2, method='exact').fit_transform(sample_df.values)
     else: # pca only
         samples = PCA(n_components=2).fit_transform(sample_df)
-        
-    pd.DataFrame(samples).to_csv(f'./{model_name}.csv', index=False)
+    pd.DataFrame(samples).to_csv(f'./{model_str}.csv', index=False)
     plt.scatter(samples[:, 0], samples[:, 1], color=color, linewidths=0.4)
         
-def viz_pca_tsne(models:list, trainset, latent_size=1000, model_names=None, is_tsne=False, is_pca=True, is_cd=False, index=0, z_r=1, gpu_ind=0, batch_size=8):
+def viz_pca_tsne(models:list, trainset, latent_size=1000, model_names=None, is_tsne=False, is_pca=True, is_cd=False, index=0, z_r=1, gpu_ind=0, batch_size=8, model_str='model'):
     print(f'is_tsne: {is_tsne}, is_pca: {is_pca}')
     if is_tsne and is_pca: title = 'TSNE-PCA'
     elif is_pca: title = 'PCA'
@@ -195,11 +194,10 @@ def viz_pca_tsne(models:list, trainset, latent_size=1000, model_names=None, is_t
         if is_cd: plt.title(f'latent vector {title} (blue is z_e)')
         else: plt.title(f'X {title} (blue is X_rand)')
         # execute PCA
-        name_str = f'{name}_E_PCA' if is_cd else f'{name}_G_PCA'
-        pca_tsne(sample_df.fillna(0), is_tsne, is_pca, c, model_name=name_str)
+        pca_tsne(sample_df.fillna(0), is_tsne, is_pca, c, model_str=f'{title}_{model_str}')
     # execute PCA
-    name_str = f'real_E_PCA' if is_cd else f'real_G_PCA'
-    pca_tsne(real_df.fillna(0), is_tsne, is_pca, colors[-1], model_name=name_str)
+    name_str = model_str + '_real'
+    pca_tsne(real_df.fillna(0), is_tsne, is_pca, colors[-1], model_str=f'{title}_{name_str}')
     plt.show()
 
 def fetch_models(checkpoints, is_E=False, iteration=100000, latent_dim=1000, gpu=0):
